@@ -281,8 +281,8 @@ def calculate_fingerprint_babel (inchi, representation = "sparse"):
     else: 
         
             
-sdf_dir = "/m/cs/project/kepaco/pubchem_local/sandbox/"  
-db_dir  = "/m/cs/project/kepaco/pubchem_local/"
+sdf_dir = "/m/cs/project/kepaco/pubchem_local/compounds_sdf/"  
+db_dir  = "/m/cs/project/kepaco/pubchem_local/db/"
 
 # Connect to the 'pubchem' database and get a cursor.
 conn = sqlite3.connect (db_dir + "pubchem")
