@@ -189,8 +189,8 @@ def split_sdf_file (sdf_file):
     
     
             
-sdf_dir = "/home/bach/mnt/on_triton/project/pubchem_local/sandbox/"  
-db_dir  = "/home/bach/mnt/on_triton/project/pubchem_local/sandbox/"
+sdf_dir = "/m/cs/project/kepaco/pubchem_local/sandbox/"  
+db_dir  = "/m/cs/project/kepaco/pubchem_local/"
 
 # Connect to the 'pubchem' database and get a cursor.
 conn = sqlite3.connect (db_dir + "pubchem")
