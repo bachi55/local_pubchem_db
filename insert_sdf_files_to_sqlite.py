@@ -25,12 +25,23 @@ Table creation: 'info'
                       smiles            varchar,
                       molecular_formula varchar
                       );
+Table creation: 'fps'
+    create table fps (cid               integer primary key,
+                      cdk_substructure  varchar,
+                      pubchem           varchar,
+                      klekota_roth      varchar,
+                      fp3               varchar,
+                      maccs             varchar,
+                      fp4               varchar,
+                      
+                     );
 """
 
 import pybel
 import glob
 import sqlite3
 import re # Regular expression
+import os 
 from timeit import default_timer as timer
 
 def insert_sdf (conn, sdf_dir):
@@ -52,7 +63,7 @@ def insert_sdf (conn, sdf_dir):
             molecules = split_sdf_file (sdf_file)
             sdf_file.close()
         except IOError:
-            print ("IOError when processing: " + sdf_fn + ".")
+            print ("IOError when processing: " + os.path.basename (sdf_fn) + ".")
             continue
         
         # Insert the sdfs into the database
@@ -64,7 +75,8 @@ def insert_sdf (conn, sdf_dir):
             conn.executemany ("INSERT INTO sdf VALUES(?,?)", molecules)
             conn.execute ("COMMIT")
         except sqlite3.Error as e:
-            print ("An error occured: '" + e.args[0] +  "', when processing " +  sdf_fn + ".")
+            print ("An error occured: '" + e.args[0] +  "', when processing " + \
+                   os.path.basename (sdf_fn) + ".")
             conn.execute ("ROLLBACK")
             continue
                 
@@ -114,6 +126,61 @@ def insert_info (conn):
             
     end = timer()
     print ("Extraction and insertation of the information - " \
+           + str (end - start) + "sec")
+    
+def insert_fps (conn):
+    """
+    Insert the fingerprint-vectors of different fingerprint definitions:
+        [CSI:FingerID]
+        - CDK Substructure fingerprints             - CDK package   (Java)
+        - PubChem (CACTVS) fingerprints (SUBSKEYS)  - pubchem       (sdf-file)
+        - Klekota–Roth fingerprints                 - CDK package   (Java)
+        - FP3 fingerprints                          - Pybel package (python)
+        - MACCS fingerprints                        - Pybel package (python)
+        
+        - Circular fingerprints                     - CDK package   (Java)
+        
+    Fingerprint storage strategy in the database:
+        1) "nbits;one-bit_1,one-bit_2,..."
+        2) String of zeros and ones of length nbits. 
+    """    
+    
+    start = timer()
+    
+    try:
+        conn.execute ("BEGIN")
+             
+        for row in conn.execute ("SELECT cid, inchi FROM info"):
+            mol_cid = row[0]
+            
+            # Parse the sdf-string of the current molecule.        
+            # This loop takes about 8s for 25000 molecules.
+            mol_sdf = calculate_fingerprint_babel (str (row[1]))
+           
+            conn.execute ("INSERT INTO info \
+                          (cid, name, exact_mass, inchi, smiles_canonical, \
+                           smiles, molecular_formula) \
+                          VALUES(?,?,?,?,?,?,?)",
+                          (mol_cid, 
+                           mol_sdf["PUBCHEM_IUPAC_NAME"],
+                           mol_sdf["PUBCHEM_EXACT_MASS"],
+                           mol_sdf["PUBCHEM_IUPAC_INCHI"],
+                           mol_sdf["PUBCHEM_OPENEYE_CAN_SMILES"],
+                           mol_sdf["PUBCHEM_OPENEYE_ISO_SMILES"],
+                           mol_sdf["PUBCHEM_MOLECULAR_FORMULA"]))
+            
+            # One transaction encompasses 25000 molecules.
+            if mol_cid % 25000 == 0:    
+                conn.execute ("COMMIT")
+                conn.execute ("BEGIN")
+                
+        conn.execute ("COMMIT")
+    except sqlite3.Error as e:
+        print ("An error occured: " + e.args[0])
+        conn.execute ("ROLLBACK")
+            
+    end = timer()
+    print ("Calculation and insertation of the fingerprints - " \
            + str (end - start) + "sec")
     
 def extract_info_from_sdf (sdf_string):
@@ -187,7 +254,32 @@ def split_sdf_file (sdf_file):
         
     return (molecules)
     
+def calculate_fingerprint_babel (inchi, representation = "sparse"):
+    """
+    Function to calculate the molecular fingerprints available through the pybel
+    package. 
     
+    inchi: InChI description of the molecule for which the fingerprint should be
+           calculated.
+           
+    return:
+        Fingerprint representation.
+    """    
+    
+    try: 
+        mol = pybel.readstring ("inchi", inchi)
+    except IOError as e:
+        print ("An error occured: " + e.args[0])
+        return "NULL"
+        
+    # Calculate the different babel fingerprints
+    FP3   = mol.calcfp ("FP3")        
+    MACCS = mol.calcfp ("MACCS")
+        
+    if representation == "sparse":
+        str (512) + ";" + ",".join (str (bit) for bit in FP3.bits)
+    else: 
+        
             
 sdf_dir = "/home/bach/mnt/on_triton/project/pubchem_local/sandbox/"  
 db_dir  = "/home/bach/mnt/on_triton/project/pubchem_local/sandbox/"
