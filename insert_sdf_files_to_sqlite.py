@@ -253,33 +253,6 @@ def split_sdf_file (sdf_file):
         start = end_pos + 5
         
     return (molecules)
-    
-def calculate_fingerprint_babel (inchi, representation = "sparse"):
-    """
-    Function to calculate the molecular fingerprints available through the pybel
-    package. 
-    
-    inchi: InChI description of the molecule for which the fingerprint should be
-           calculated.
-           
-    return:
-        Fingerprint representation.
-    """    
-    
-    try: 
-        mol = pybel.readstring ("inchi", inchi)
-    except IOError as e:
-        print ("An error occured: " + e.args[0])
-        return "NULL"
-        
-    # Calculate the different babel fingerprints
-    FP3   = mol.calcfp ("FP3")        
-    MACCS = mol.calcfp ("MACCS")
-        
-    if representation == "sparse":
-        str (512) + ";" + ",".join (str (bit) for bit in FP3.bits)
-    else: 
-        
             
 sdf_dir = "/m/cs/project/kepaco/pubchem_local/compounds_sdf/"  
 db_dir  = "/m/cs/project/kepaco/pubchem_local/db/"
@@ -290,7 +263,6 @@ conn.isolation_level = None
 
 #insert_sdf (conn, sdf_dir)
 insert_info (conn)
-#insert_fps (conn)
 
 conn.close()
 
