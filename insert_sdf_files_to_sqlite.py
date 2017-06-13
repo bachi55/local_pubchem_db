@@ -11,9 +11,18 @@ Database layout:
                                      ...
                 --> TABLE-3: 'fp', contains the fingerprint-vectors for each 
                                    compound.
+                --> TABLE-4: 'sdf_file', contains the filenames of the 
+                                         sdf-files successfully added to the 
+                                         DB.
 """
 
 """
+Table creation: 'sdf_file'
+    create table sdf_file(filename           varchar primary key,
+                          last_modification  varchar, 
+                          lowest_cid         integer, 
+                          highest_cid        integer
+                         );
 Table creation: 'sdf'
     create table sdf(cid integer primary key, sdf_string varchar);
 Table creation: 'info'
@@ -25,19 +34,19 @@ Table creation: 'info'
                       smiles            varchar,
                       molecular_formula varchar
                       );
-Table creation: 'fps'
-    create table fps (cid               integer primary key,
-                      cdk_substructure  varchar,
-                      pubchem           varchar,
-                      klekota_roth      varchar,
-                      fp3               varchar,
-                      maccs             varchar,
-                      fp4               varchar,
-                      
-                     );
+Table creation: 'fp'
+    create table fp(cid               integer primary key,
+                    cdk_substructure  varchar,
+                    pubchem           varchar,
+                    klekota_roth      varchar,
+                    fp3               varchar,
+                    maccs             varchar,
+                    fp4               varchar,
+                   );
 """
 
 # import pybel
+import Queue
 import glob
 import sqlite3
 import re # Regular expression
@@ -54,7 +63,11 @@ def insert_sdf (conn, sdf_dir):
     sdf_dir: Path to the sdf-directory. 
     """
    
+    # Get a list of all sdf-files available
     sdf_files = glob.glob (sdf_dir + "*.sdf")
+    sdf_files = remove_sdf_files_already_in_DB (conn, sdf_files)
+    
+    
     n_files   = len (sdf_files)
     i_file    = 1
     print (str (n_files) + " sdf-lists found.")
@@ -89,6 +102,11 @@ def insert_sdf (conn, sdf_dir):
         print ("Processed (" + str (i_file) + "/" + str (n_files) + "): " + \
                 os.path.basename (sdf_fn) + " - " + str (round (end - start, 2)) + "sec")
         i_file = i_file + 1
+
+def remove_sdf_files_already_in_DB (conn, sdf_files):
+    """
+    
+    """
         
 def insert_info (conn):
     """
@@ -260,20 +278,105 @@ def split_sdf_file (sdf_file):
         start = end_pos + 5
         
     return (molecules)
-            
+         
+def initialize_DB (conn, reset = False):
+    """
+    Initialization of the DB: 
+        - Remove existing tables if desired.
+        - Create not present tables. 
+        
+    conn: sqlite3.Connection 
+        Connection to the database to modify.
+    reset: Boolean
+        If 'True' then the tables in the database are emptied.
+    """
+    
+    # Check whether 'sdf' exists:
+    cur     = conn.execute ("SELECT name FROM sqlite_master \
+                             WHERE type='table' AND name='sdf'")
+    len_cur = len (cur.fetchall())
+    
+    if reset & (len_cur > 0):
+        conn.execute ("DROP TABLE sdf")
+        len_cur = 0;
+        
+    if len_cur == 0:
+        conn.execute ("CREATE TABLE sdf(cid integer primary key, sdf_string varchar)")
+    
+    # Check whether 'info' exists:
+    cur     = conn.execute ("SELECT name FROM sqlite_master \
+                             WHERE type='table' AND name='info'")
+    len_cur = len (cur.fetchall())
+    
+    if reset & (len_cur > 0):
+        conn.execute ("DROP TABLE info")
+        len_cur = 0;
+        
+    if len_cur == 0:
+        conn.execute ("CREATE TABLE info(cid               integer primary key, \
+                                         name              varchar,             \
+                                         exact_mass        real,                \
+                                         inchi             varchar,             \
+                                         smiles_canonical  varchar,             \
+                                         smiles            varchar,             \
+                                         molecular_formula varchar              \
+                                         );")
+    
+    # Check whether 'fp' exists:
+    cur     = conn.execute ("SELECT name FROM sqlite_master \
+                             WHERE type='table' AND name='fp'")
+    len_cur = len (cur.fetchall())
+    
+    if reset & (len_cur > 0):
+        conn.execute ("DROP TABLE fp")
+        len_cur = 0;
+        
+    if len_cur == 0:
+        conn.execute ("CREATE TABLE fp(cid               integer primary key, \
+                                       cdk_substructure  varchar,             \
+                                       pubchem           varchar,             \
+                                       klekota_roth      varchar,             \
+                                       fp3               varchar,             \
+                                       maccs             varchar,             \
+                                       fp4               varchar              \
+                                       );")
+        
+    # Check whether 'sdf_file' exsits:
+    cur     = conn.execute ("SELECT name FROM sqlite_master \
+                             WHERE type='table' AND name='sdf_file'")
+    len_cur = len (cur.fetchall())
+    
+    if reset & (len_cur > 0):
+        conn.execute ("DROP TABLE sdf_file")
+        len_cur = 0;
+        
+    if len_cur == 0:
+        conn.execute ("CREATE TABLE sdf_file(filename           varchar primary key, \
+                                             last_modification  varchar,             \
+                                             lowest_cid         integer,             \
+                                             highest_cid        integer              \
+                                            );")
+  
+### MAIN ###     
 sdf_dir = "/m/cs/project/kepaco/pubchem_local/compounds_sdf/"  
 db_dir  = "/m/cs/project/kepaco/pubchem_local/db/"
 
+sdf_dir_sandbox = "/home/bach/mnt/on_triton/project/pubchem_local/sandbox/"
+db_dir_sandbox  = "/home/bach/mnt/on_triton/project/pubchem_local/sandbox/"
+
+# Connect to the 'pubchem' database.
+conn = sqlite3.connect (db_dir_sandbox + "pubchem",
+                        isolation_level = None)
+
 try:
-    # Connect to the 'pubchem' database.
-    conn = sqlite3.connect (db_dir + "pubchem")
-    conn.isolation_level = None
-
-    insert_sdf (conn, sdf_dir)
-
-    conn.close()
+    initialize_DB (conn, reset = True)
 except sqlite3.Error as e:
     print ("An error occured: " + e.args[0])
+
+#insert_sdf (conn, sdf_dir_sandbox)
+
+conn.close()
+
 
 
 #insert_sdf (conn, sdf_dir)

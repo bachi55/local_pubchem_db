@@ -1,0 +1,4 @@
+## == Useful SQLite-queries ==
+
+# List all the tables in the database:
+select name from sqlite_master where type='table';
