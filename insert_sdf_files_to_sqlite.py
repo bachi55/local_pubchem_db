@@ -153,61 +153,6 @@ def insert_info (conn):
     print ("Extraction and insertation of the information - " \
            + str (end - start) + "sec")
     
-def insert_fps (conn):
-    """
-    Insert the fingerprint-vectors of different fingerprint definitions:
-        [CSI:FingerID]
-        - CDK Substructure fingerprints             - CDK package   (Java)
-        - PubChem (CACTVS) fingerprints (SUBSKEYS)  - pubchem       (sdf-file)
-        - Klekota-Roth fingerprints                 - CDK package   (Java)
-        - FP3 fingerprints                          - Pybel package (python)
-        - MACCS fingerprints                        - Pybel package (python)
-        
-        - Circular fingerprints                     - CDK package   (Java)
-        
-    Fingerprint storage strategy in the database:
-        1) "nbits;one-bit_1,one-bit_2,..."
-        2) String of zeros and ones of length nbits. 
-    """    
-    
-    start = timer()
-    
-    try:
-        conn.execute ("BEGIN")
-             
-        for row in conn.execute ("SELECT cid, inchi FROM info"):
-            mol_cid = row[0]
-            
-            # Parse the sdf-string of the current molecule.        
-            # This loop takes about 8s for 25000 molecules.
-            mol_sdf = calculate_fingerprint_babel (str (row[1]))
-           
-            conn.execute ("INSERT INTO info \
-                          (cid, name, exact_mass, inchi, smiles_canonical, \
-                           smiles, molecular_formula) \
-                          VALUES(?,?,?,?,?,?,?)",
-                          (mol_cid, 
-                           mol_sdf["PUBCHEM_IUPAC_NAME"],
-                           mol_sdf["PUBCHEM_EXACT_MASS"],
-                           mol_sdf["PUBCHEM_IUPAC_INCHI"],
-                           mol_sdf["PUBCHEM_OPENEYE_CAN_SMILES"],
-                           mol_sdf["PUBCHEM_OPENEYE_ISO_SMILES"],
-                           mol_sdf["PUBCHEM_MOLECULAR_FORMULA"]))
-            
-            # One transaction encompasses 25000 molecules.
-            if mol_cid % 25000 == 0:    
-                conn.execute ("COMMIT")
-                conn.execute ("BEGIN")
-                
-        conn.execute ("COMMIT")
-    except sqlite3.Error as e:
-        print ("An error occured: " + e.args[0])
-        conn.execute ("ROLLBACK")
-            
-    end = timer()
-    print ("Calculation and insertation of the fingerprints - " \
-           + str (end - start) + "sec")
-    
 def extract_info_from_sdf (sdf_string):
     """
     Extract the information for a given molecules from its sdf-string. 
