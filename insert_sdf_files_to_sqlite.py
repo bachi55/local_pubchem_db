@@ -37,7 +37,7 @@ Table creation: 'fps'
                      );
 """
 
-import pybel
+# import pybel
 import glob
 import sqlite3
 import re # Regular expression
@@ -53,8 +53,13 @@ def insert_sdf (conn, sdf_dir):
     conn: Database connection
     sdf_dir: Path to the sdf-directory. 
     """
-    
-    for sdf_fn in glob.glob (sdf_dir + "*.sdf"):
+   
+    sdf_files = glob.glob (sdf_dir + "*.sdf")
+    n_files   = len (sdf_files)
+    i_file    = 1
+    print (str (n_files) + " sdf-lists found.")
+
+    for sdf_fn in sdf_files:        
         start = timer()
         
         # Open the sdf-file
@@ -81,7 +86,9 @@ def insert_sdf (conn, sdf_dir):
             continue
                 
         end = timer()
-        print ("Processed: " + sdf_fn + " - " + str (end - start) + "sec")
+        print ("Processed (" + str (i_file) + "/" + str (n_files) + "): " + \
+                os.path.basename (sdf_fn) + " - " + str (round (end - start, 2)) + "sec")
+        i_file = i_file + 1
         
 def insert_info (conn):
     """
@@ -134,7 +141,7 @@ def insert_fps (conn):
         [CSI:FingerID]
         - CDK Substructure fingerprints             - CDK package   (Java)
         - PubChem (CACTVS) fingerprints (SUBSKEYS)  - pubchem       (sdf-file)
-        - Klekota–Roth fingerprints                 - CDK package   (Java)
+        - Klekota-Roth fingerprints                 - CDK package   (Java)
         - FP3 fingerprints                          - Pybel package (python)
         - MACCS fingerprints                        - Pybel package (python)
         
@@ -257,14 +264,19 @@ def split_sdf_file (sdf_file):
 sdf_dir = "/m/cs/project/kepaco/pubchem_local/compounds_sdf/"  
 db_dir  = "/m/cs/project/kepaco/pubchem_local/db/"
 
-# Connect to the 'pubchem' database and get a cursor.
-conn = sqlite3.connect (db_dir + "pubchem")
-conn.isolation_level = None
+try:
+    # Connect to the 'pubchem' database.
+    conn = sqlite3.connect (db_dir + "pubchem")
+    conn.isolation_level = None
+
+    insert_sdf (conn, sdf_dir)
+
+    conn.close()
+except sqlite3.Error as e:
+    print ("An error occured: " + e.args[0])
+
 
 #insert_sdf (conn, sdf_dir)
-insert_info (conn)
-
-conn.close()
 
 
 #cur.execute ("INSERT INTO sdf VALUES(?,?)", 
