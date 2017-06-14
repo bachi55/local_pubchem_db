@@ -142,9 +142,7 @@ def insert_sdf (conn, sdf_dir, max_num_attempts = 5):
             # current sdf-file.
             print ("An operational / internal error occured: '" + e.args[0] + "', when \
                     processing " + os.path.basename (sdf_fn) + ".")
-            try:
-                conn.execute ("ROLLBACK")
-            except:
+            conn.execute ("ROLLBACK")
             
             # Increase the number of attempts due to an unsuccessful try.
             num_attempts = num_attempts + 1
@@ -157,9 +155,9 @@ def insert_sdf (conn, sdf_dir, max_num_attempts = 5):
             continue 
                 
         end = timer()
-#        print ("Processed (" + str (i_file) + "/" + str (n_files) + "): " + \
-#                os.path.basename (sdf_fn) + " - " + str (round (end - start, 2)) + "sec")
-#        i_file = i_file + 1
+        print ("Processed: " + os.path.basename (sdf_fn) + \
+               " - " + str (round (end - start, 2)) + "sec (" + \
+               str (que_sdf_files.qsize()) + " remain)")
 
 def get_sdf_files_not_in_DB (conn, sdf_files_in_folder):
     """
@@ -383,7 +381,7 @@ db_dir_sandbox  = "/home/bach/mnt/on_triton/project/pubchem_local/sandbox/"
 
 # Connect to the 'pubchem' database.
 conn = sqlite3.connect (db_dir_sandbox + "pubchem",
-                        isolation_level = None)
+                        isolation_level = None) 
 
 try:
     initialize_DB (conn, reset = True)
