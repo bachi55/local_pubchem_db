@@ -18,10 +18,11 @@ Database layout:
 
 """
 Table creation: 'sdf_file'
-    create table sdf_file(filename           varchar primary key,
-                          last_modification  varchar, 
-                          lowest_cid         integer, 
-                          highest_cid        integer
+    create table sdf_file(filename                 varchar primary key,
+                          last_modification        real, 
+                          last_modification_ctime  varchar, 
+                          lowest_cid               integer, 
+                          highest_cid              integer
                          );
 Table creation: 'sdf'
     create table sdf(cid integer primary key, sdf_string varchar);
@@ -51,9 +52,11 @@ import glob
 import sqlite3
 import re # Regular expression
 import os 
+import time
 from timeit import default_timer as timer
 
-def insert_sdf (conn, sdf_dir):
+
+def insert_sdf (conn, sdf_dir, max_num_attempts = 5):
     """
     Function to insert a set of sdf files into a database. The directory 
     containing the sdf files is screened and all contained sdf files are 
@@ -63,50 +66,118 @@ def insert_sdf (conn, sdf_dir):
     sdf_dir: Path to the sdf-directory. 
     """
    
-    # Get a list of all sdf-files available
+    # Get a list of all sdf-files available and reduce it to the ones still 
+    # needed to be processed.
     sdf_files = glob.glob (sdf_dir + "*.sdf")
-    sdf_files = remove_sdf_files_already_in_DB (conn, sdf_files)
+    sdf_files = get_sdf_files_not_in_DB (conn, sdf_files)
     
-    
-    n_files   = len (sdf_files)
-    i_file    = 1
-    print (str (n_files) + " sdf-lists found.")
-
-    for sdf_fn in sdf_files:        
-        start = timer()
+    # Add the sdf-files into a Queue to process them. Each sdf-file is stored
+    # together with an integer indicating how often this file was already tried 
+    # to be added to the DB. It can happen that there is an IO-Error and we need 
+    # to retry to add a sdf-file. However, we want to restrict the maximum 
+    # number of tries.
+    que_sdf_files = Queue.LifoQueue()
+    for sdf_file in sdf_files:
+        que_sdf_files.put ((sdf_file, 0))
         
+    que_sdf_files_failed = Queue.Queue()
+    
+    n_files = que_sdf_files.qsize()
+    print (str (n_files) + " sdf-lists needs to be processed.")
+
+    while not que_sdf_files.empty():                
+        start = timer()
+
         # Open the sdf-file
         try:
-            sdf_file  = open (sdf_fn)
-            molecules = split_sdf_file (sdf_file)
+            sdf_fn, num_attempts = que_sdf_files.get()
+            sdf_file             = open (sdf_fn)
+            molecules            = split_sdf_file (sdf_file)
             sdf_file.close()
-        except IOError:
-            print ("IOError when processing: " + os.path.basename (sdf_fn) + ".")
+        except IOError as e:
+            print ("An IOError occured: '" + os.strerror (e.args[0]) + "' when processing " \
+                   + os.path.basename (sdf_fn) + ".")
+            
+            # Increase the number of attempts due to an unsuccessful try.
+            num_attempts = num_attempts + 1
+            if num_attempts < max_num_attempts:
+                # Enqueue the sdf-file again for a later try.
+                que_sdf_files.put ((sdf_fn, num_attempts))
+            else: 
+                que_sdf_files_failed.put (sdf_fn)
+            
             continue
         
         # Insert the sdfs into the database
         try:
+#            raise sqlite3.OperationalError ('My operational error')
+            
             # Commit all molecules in a block to decrease the number of 
             # transactions.
             conn.execute ("BEGIN")    
             # This version takes about 3s for 25000 molecules.
             conn.executemany ("INSERT INTO sdf VALUES(?,?)", molecules)
+            
+            conn.execute ("INSERT INTO sdf_file                                   \
+                           (filename, last_modification, last_modification_ctime, \
+                            lowest_cid, highest_cid)                              \
+                           VALUES(?,?,?,?,?)", 
+                          (os.path.basename (sdf_fn), 
+                           os.path.getmtime (sdf_fn), 
+                           time.ctime (os.path.getmtime (sdf_fn)),
+                           os.path.basename (sdf_fn).split(".")[0].split("_")[1],
+                           os.path.basename (sdf_fn).split(".")[0].split("_")[2]))
+            
             conn.execute ("COMMIT")
-        except sqlite3.Error as e:
-            print ("An error occured: '" + e.args[0] +  "', when processing " + \
-                   os.path.basename (sdf_fn) + ".")
+        except sqlite3.ProgrammingError as e: 
+            # Error caused by the programmer, e.g. incorrect query. This error 
+            # indicates a logical error, which needs to be fixed. 
+            print ("A programming error occured: '" + e.args[0] + "', when \
+                    processing " + os.path.basename (sdf_fn) + ".")
             conn.execute ("ROLLBACK")
-            continue
+            raise
+        except (sqlite3.OperationalError, sqlite3.InternalError) as e: 
+            # Error caused by the database, e.g. lost connection, memory 
+            # allocation error, DB out of sync. We should re-try to add the 
+            # current sdf-file.
+            print ("An operational / internal error occured: '" + e.args[0] + "', when \
+                    processing " + os.path.basename (sdf_fn) + ".")
+            try:
+                conn.execute ("ROLLBACK")
+            except:
+            
+            # Increase the number of attempts due to an unsuccessful try.
+            num_attempts = num_attempts + 1
+            if num_attempts < max_num_attempts:
+                # Enqueue the sdf-file again for a later try.
+                que_sdf_files.put ((sdf_fn, num_attempts))
+            else: 
+                que_sdf_files_failed.put (sdf_fn)
+            
+            continue 
                 
         end = timer()
-        print ("Processed (" + str (i_file) + "/" + str (n_files) + "): " + \
-                os.path.basename (sdf_fn) + " - " + str (round (end - start, 2)) + "sec")
-        i_file = i_file + 1
+#        print ("Processed (" + str (i_file) + "/" + str (n_files) + "): " + \
+#                os.path.basename (sdf_fn) + " - " + str (round (end - start, 2)) + "sec")
+#        i_file = i_file + 1
 
-def remove_sdf_files_already_in_DB (conn, sdf_files):
+def get_sdf_files_not_in_DB (conn, sdf_files_in_folder):
     """
+    Returns the sdf_file names (full path) which are not already in the DB.
     
+    TODO: We can extent this function to handle the situation of an update of 
+          the DB, e.g. a newer sdf-file is available.
+    
+    conn: sqlite3.Connection
+        Connection to the DB.
+    sdf_files_in_folder: List of strings
+        List of the filenames of the sdf-files.
     """
+    sdf_files_in_DB = conn.execute ("SELECT filename FROM sdf_file").fetchall()
+    sdf_files_in_DB = [str (tmp[0]) for tmp in sdf_files_in_DB]
+                             
+    return (filter (lambda x: os.path.basename (x) not in sdf_files_in_DB, 
+                    sdf_files_in_folder))
         
 def insert_info (conn):
     """
@@ -296,10 +367,11 @@ def initialize_DB (conn, reset = False):
         len_cur = 0;
         
     if len_cur == 0:
-        conn.execute ("CREATE TABLE sdf_file(filename           varchar primary key, \
-                                             last_modification  varchar,             \
-                                             lowest_cid         integer,             \
-                                             highest_cid        integer              \
+        conn.execute ("CREATE TABLE sdf_file(filename                varchar primary key, \
+                                             last_modification       real,                \
+                                             last_modification_ctime varchar,             \
+                                             lowest_cid              integer,             \
+                                             highest_cid             integer              \
                                             );")
   
 ### MAIN ###     
@@ -315,12 +387,13 @@ conn = sqlite3.connect (db_dir_sandbox + "pubchem",
 
 try:
     initialize_DB (conn, reset = True)
+    insert_sdf (conn, sdf_dir_sandbox)
 except sqlite3.Error as e:
-    print ("An error occured: " + e.args[0])
+    print ("An error occured: '" + e.args[0] + "'.")
 
 #insert_sdf (conn, sdf_dir_sandbox)
-
 conn.close()
+
 
 
 
