@@ -76,7 +76,7 @@ def insert_sdf (conn, sdf_dir, max_num_attempts = 5):
     # to be added to the DB. It can happen that there is an IO-Error and we need 
     # to retry to add a sdf-file. However, we want to restrict the maximum 
     # number of tries.
-    que_sdf_files = Queue.LifoQueue()
+    que_sdf_files = Queue.Queue()
     for sdf_file in sdf_files:
         que_sdf_files.put ((sdf_file, 0))
         
