@@ -1,3 +1,11 @@
+import queue
+import glob
+import sqlite3
+import re  # Regular expression
+import os
+import sys
+from timeit import default_timer as timer
+
 """
 This script can be used to parse a set of SDF files and add (some of) the
 content to a SQLite database.
@@ -46,17 +54,8 @@ Table creation: 'fp'
                    );
 """
 
-import queue
-import glob
-import sqlite3
-import re # Regular expression
-import os 
-import numpy as np
-import sys
-from timeit import default_timer as timer
 
-
-def insert_sdf(db_connection, sdf_directory, max_num_attempts = 5):
+def insert_sdf(db_connection, sdf_directory, max_num_attempts=5):
     """
     Function to insert a set of sdf files into a database. The directory 
     containing the sdf files is screened and all contained sdf files are 
@@ -268,12 +267,12 @@ def extract_info_from_sdf(sdf):
     """
     
     info = {
-        "PUBCHEM_COMPOUND_CID"        : np.nan, # integer
+        "PUBCHEM_COMPOUND_CID"        : -1, # integer
         "PUBCHEM_IUPAC_NAME"          : "NULL", # string
         "PUBCHEM_IUPAC_INCHI"         : "NULL", # string
         "PUBCHEM_IUPAC_INCHIKEY"      : "NULL", # string
-        "PUBCHEM_XLOGP3_AA"           : np.nan, # float
-        "PUBCHEM_MONOISOTOPIC_WEIGHT" : np.nan, # float
+        "PUBCHEM_XLOGP3_AA"           : -9999, # float
+        "PUBCHEM_MONOISOTOPIC_WEIGHT" : -1, # float
         "PUBCHEM_MOLECULAR_FORMULA"   : "NULL", # string
         "PUBCHEM_OPENEYE_ISO_SMILES"  : "NULL"  # string
     }
