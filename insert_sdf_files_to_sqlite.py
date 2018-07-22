@@ -52,6 +52,7 @@ import sqlite3
 import re # Regular expression
 import os 
 import numpy as np
+import sys
 from timeit import default_timer as timer
 
 
@@ -433,15 +434,25 @@ def initialize_db(db_connection, add_sdf=True, add_info=True, add_sdf_file=True,
 
 if __name__ == "__main__":
 
-    sdf_dir = "/m/cs/project/kepaco/pubchem_local/compounds_sdf/"
-    db_dir = "/m/cs/project/kepaco/pubchem_local/db/"
+    if len(sys.argv) < 2:
+        print("Usage: python %s <PUBCHEM_DB_BASEDIR> <RESET_DB>" % os.path.basename(sys.argv[0]))
+        print("Example:")
+        print("\t python %s /run/media/bach/Intenso/data/pubchem/ True" % os.path.basename(sys.argv[0]))
+        exit(1)
 
-    sdf_dir_sandbox = "/run/media/bach/Intenso/data/sandbox/"
-    db_dir_sandbox = "/run/media/bach/Intenso/data/sandbox/"
-    reset_database = True
+    basedir = sys.argv[1]
+    reset_database = eval(sys.argv[2])
+
+    sdf_dir = basedir + "/sdf/"
+    db_dir = basedir + "/db/"
+
+
+    #sdf_dir_sandbox = "/run/media/bach/Intenso/data/sandbox/"
+    #db_dir_sandbox = "/run/media/bach/Intenso/data/sandbox/"
+    #reset_database = True
 
     # Connect to the 'pubchem' database.
-    conn = sqlite3.connect(db_dir_sandbox + "/pubchem.db", isolation_level=None)
+    conn = sqlite3.connect(db_dir + "/pubchem.db", isolation_level=None)
     try:
         # Initialize the database
         with conn:
@@ -449,7 +460,7 @@ if __name__ == "__main__":
 
         # Get a list of all sdf-files available and reduce it to the ones still
         # needed to be processed.
-        sdf_files = glob.glob(sdf_dir_sandbox + "*.sdf")
+        sdf_files = glob.glob(sdf_dir + "*.sdf")
         print("Sdf-files to process (before filtering): %d" % len(sdf_files))
 
         with conn:
@@ -478,7 +489,7 @@ if __name__ == "__main__":
     except sqlite3.DatabaseError as err:
         print("Database error: '" + err.args[0] + "'.")
     except IOError as err:
-        print("An IOError occured: '" + os.strerror(err.args[0]) + "'.")
+        print("An IOError occurred: '" + os.strerror(err.args[0]) + "'.")
     except Exception as err:
         print(err.args[0])
     finally:
