@@ -267,14 +267,14 @@ def extract_info_from_sdf(sdf):
     """
     
     info = {
-        "PUBCHEM_COMPOUND_CID"        : -1, # integer
-        "PUBCHEM_IUPAC_NAME"          : "NULL", # string
-        "PUBCHEM_IUPAC_INCHI"         : "NULL", # string
-        "PUBCHEM_IUPAC_INCHIKEY"      : "NULL", # string
-        "PUBCHEM_XLOGP3_AA"           : -9999, # float
-        "PUBCHEM_MONOISOTOPIC_WEIGHT" : -1, # float
-        "PUBCHEM_MOLECULAR_FORMULA"   : "NULL", # string
-        "PUBCHEM_OPENEYE_ISO_SMILES"  : "NULL"  # string
+        "PUBCHEM_COMPOUND_CID"        : None, # integer
+        "PUBCHEM_IUPAC_NAME"          : None, # string
+        "PUBCHEM_IUPAC_INCHI"         : None, # string
+        "PUBCHEM_IUPAC_INCHIKEY"      : None, # string
+        "PUBCHEM_XLOGP3_AA"           : None, # float
+        "PUBCHEM_MONOISOTOPIC_WEIGHT" : None, # float
+        "PUBCHEM_MOLECULAR_FORMULA"   : None, # string
+        "PUBCHEM_OPENEYE_ISO_SMILES"  : None  # string
     }
     found = {key: False for key in info.keys()}
 
@@ -399,20 +399,20 @@ def initialize_db(db_connection, add_sdf=True, add_info=True, add_sdf_file=True,
     # Check whether 'info' exists:
     if add_info:
         cur = db_connection.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='info'")
-        len_cur = len (cur.fetchall())
+        len_cur = len(cur.fetchall())
 
         if reset & (len_cur > 0):
             db_connection.execute("DROP TABLE info")
             len_cur = 0
 
         if len_cur == 0:
-            db_connection.execute("CREATE TABLE info(cid                 integer primary key, \
-                                             iupac_name          varchar,             \
-                                             iupac_inchi         varchar,             \
-                                             iupac_inchikey      varchar,             \
-                                             xlogp3              real,                \
-                                             monoisotopic_mass   real,                \
-                                             molecular_formula   varchar,             \
+            db_connection.execute("CREATE TABLE info(cid         integer primary key         , \
+                                             iupac_name          varchar                     , \
+                                             iupac_inchi         varchar             not null, \
+                                             iupac_inchikey      varchar                     , \
+                                             xlogp3              real                        , \
+                                             monoisotopic_mass   real                not null, \
+                                             molecular_formula   varchar             not null, \
                                              smiles              varchar);")
 
     # Check whether 'sdf_file' exsits:
@@ -425,7 +425,7 @@ def initialize_db(db_connection, add_sdf=True, add_info=True, add_sdf_file=True,
             len_cur = 0
 
         if len_cur == 0:
-            db_connection.execute("CREATE TABLE sdf_file(filename                varchar primary key, \
+            db_connection.execute("CREATE TABLE sdf_file(filename        varchar primary key, \
                                                  lowest_cid              integer,             \
                                                  highest_cid             integer              \
                                                 );")
