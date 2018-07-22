@@ -237,6 +237,9 @@ def insert_info_from_sdf_strings(db_connection, l_cid_sdf):
         mol_sdf = extract_info_from_sdf(sdf)
 
         assert (cid == mol_sdf["PUBCHEM_COMPOUND_CID"])
+        if mol_sdf["PUBCHEM_COMPOUND_CID"] is None or mol_sdf["PUBCHEM_IUPAC_INCHI"] is None or \
+                mol_sdf["PUBCHEM_MONOISOTOPIC_WEIGHT"] is None or mol_sdf["PUBCHEM_MOLECULAR_FORMULA"] is None:
+            continue
 
         db_connection.execute("INSERT INTO info \
                       (cid, iupac_name, iupac_inchi, iupac_inchikey, xlogp3, \
@@ -267,14 +270,14 @@ def extract_info_from_sdf(sdf):
     """
     
     info = {
-        "PUBCHEM_COMPOUND_CID"        : None, # integer
-        "PUBCHEM_IUPAC_NAME"          : None, # string
-        "PUBCHEM_IUPAC_INCHI"         : None, # string
-        "PUBCHEM_IUPAC_INCHIKEY"      : None, # string
-        "PUBCHEM_XLOGP3_AA"           : None, # float
-        "PUBCHEM_MONOISOTOPIC_WEIGHT" : None, # float
-        "PUBCHEM_MOLECULAR_FORMULA"   : None, # string
-        "PUBCHEM_OPENEYE_ISO_SMILES"  : None  # string
+        "PUBCHEM_COMPOUND_CID":        None,  # integer
+        "PUBCHEM_IUPAC_NAME":          None,  # string
+        "PUBCHEM_IUPAC_INCHI":         None,  # string
+        "PUBCHEM_IUPAC_INCHIKEY":      None,  # string
+        "PUBCHEM_XLOGP3_AA":           None,  # float
+        "PUBCHEM_MONOISOTOPIC_WEIGHT": None,  # float
+        "PUBCHEM_MOLECULAR_FORMULA":   None,  # string
+        "PUBCHEM_OPENEYE_ISO_SMILES":  None   # string
     }
     found = {key: False for key in info.keys()}
 
@@ -406,7 +409,7 @@ def initialize_db(db_connection, add_sdf=True, add_info=True, add_sdf_file=True,
             len_cur = 0
 
         if len_cur == 0:
-            db_connection.execute("CREATE TABLE info(cid         integer primary key         , \
+            db_connection.execute("CREATE TABLE info(cid         integer primary key not null, \
                                              iupac_name          varchar                     , \
                                              iupac_inchi         varchar             not null, \
                                              iupac_inchikey      varchar                     , \
