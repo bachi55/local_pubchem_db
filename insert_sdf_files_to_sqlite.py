@@ -115,26 +115,24 @@ def insert_sdf(db_connection, sdf_directory, max_num_attempts=5):
             # This version takes about 3s for 25000 molecules.
             db_connection.executemany("INSERT INTO sdf VALUES(?,?)", molecules)
             
-            db_connection.execute("INSERT INTO sdf_file                \
-                           (filename, lowest_cid, highest_cid) \
-                           VALUES(?,?,?)", (
+            db_connection.execute("INSERT INTO sdf_file (filename, lowest_cid, highest_cid) VALUES(?,?,?)", (
                 os.path.basename(sdf_filename),
                 os.path.basename(sdf_filename).split(".")[0].split("_")[1],
                 os.path.basename(sdf_filename).split(".")[0].split("_")[2]))
             
             db_connection.execute("COMMIT")
-        except sqlite3.ProgrammingError as err:
+        except sqlite3.ProgrammingError as error:
             # Error caused by the programmer, e.g. incorrect query. This error 
             # indicates a logical error, which needs to be fixed. 
-            print("A programming error occurred: '" + err.args[0] + "', when processing " +
+            print("A programming error occurred: '" + error.args[0] + "', when processing " +
                   os.path.basename(sdf_filename) + ".")
             db_connection.execute("ROLLBACK")
             raise
-        except (sqlite3.OperationalError, sqlite3.InternalError) as err:
+        except (sqlite3.OperationalError, sqlite3.InternalError) as error:
             # Error caused by the database, e.g. lost connection, memory 
             # allocation error, DB out of sync. We should re-try to add the 
             # current sdf-file.
-            print("An operational / internal error occurred: '" + err.args[0] + "', when processing " +
+            print("An operational / internal error occurred: '" + error.args[0] + "', when processing " +
                   os.path.basename(sdf_filename) + ".")
             db_connection.execute("ROLLBACK")
             
@@ -213,8 +211,8 @@ def insert_info(db_connection, chunk_size=10000):
                 inserted_cids = inserted_cids + 1
                 
         db_connection.execute("COMMIT")
-    except sqlite3.Error as err:
-        print("An error occured: " + err.args[0])
+    except sqlite3.Error as error:
+        print("An error occured: " + error.args[0])
         db_connection.execute("ROLLBACK")
             
     end = timer()
@@ -365,7 +363,7 @@ def split_sdf_file(sdf_file_stream):
         # Extract the sdf-string and the cid
         sdf_str = sdf_lines[start:end_pos-1]
         sdf_str = sdf_str.replace("'", "")
-        cid = int (re.findall("<PUBCHEM_COMPOUND_CID>\n([0-9]+)", sdf_str)[0])
+        cid = int(re.findall("<PUBCHEM_COMPOUND_CID>\n([0-9]+)", sdf_str)[0])
 
         sdfs.append((cid, sdf_str))
 
@@ -382,7 +380,8 @@ def initialize_db(db_connection, add_sdf=True, add_info=True, add_sdf_file=True,
         
     :param db_connection: sqlite3.Connection, connection to the database to modify.
     :param add_sdf: boolean, should the sdf table be added containing the fill sdf-string for each CID
-    :param add_info: boolean, should the info table be added containing information from the parsed sdf-strings for each CID
+    :param add_info: boolean, should the info table be added containing information from the parsed sdf-strings for each
+        CID
     :param add_sdf_file: boolean, should the sdf_file table be added containing the filenames of all processed sdf-files
     :param reset: boolean, If 'True' tables in the database are dropped and recreated.
     """
@@ -390,7 +389,7 @@ def initialize_db(db_connection, add_sdf=True, add_info=True, add_sdf_file=True,
     # Check whether 'sdf' exists:
     if add_sdf:
         cur = db_connection.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sdf'")
-        len_cur = len (cur.fetchall())
+        len_cur = len(cur.fetchall())
 
         if reset & (len_cur > 0):
             db_connection.execute("DROP TABLE sdf")
@@ -448,11 +447,6 @@ if __name__ == "__main__":
     sdf_dir = basedir + "/sdf/"
     db_dir = basedir + "/db/"
 
-
-    #sdf_dir_sandbox = "/run/media/bach/Intenso/data/sandbox/"
-    #db_dir_sandbox = "/run/media/bach/Intenso/data/sandbox/"
-    #reset_database = True
-
     # Connect to the 'pubchem' database.
     conn = sqlite3.connect(db_dir + "/pubchem.db", isolation_level=None)
     try:
@@ -472,16 +466,14 @@ if __name__ == "__main__":
 
         # Iterate over the sdf-fles and add them one by one
         for ii, sdf_fn in enumerate(sdf_files):
-            print ("Process sdf-file: %d/%d" % (ii + 1, len(sdf_files)))
+            print("Process sdf-file: %d/%d" % (ii + 1, len(sdf_files)))
 
             # parse and insert current sdf-file
             with open(sdf_fn) as sdf_file, conn:
                 insert_info_from_sdf_strings(conn, split_sdf_file(sdf_file))
 
                 # add current sdf-file to the list of completed sdf-files
-                conn.execute("INSERT INTO sdf_file               \
-                              (filename, lowest_cid, highest_cid) \
-                              VALUES(?,?,?)", (
+                conn.execute("INSERT INTO sdf_file (filename, lowest_cid, highest_cid) VALUES(?,?,?)", (
                     os.path.basename(sdf_fn),
                     os.path.basename(sdf_fn).split(".")[0].split("_")[1],
                     os.path.basename(sdf_fn).split(".")[0].split("_")[2]))
@@ -496,38 +488,3 @@ if __name__ == "__main__":
         print(err.args[0])
     finally:
         conn.close()
-
-
-    # Insert the sdf string from the sdf-files
-    # insert_sdf (conn, sdf_dir_sandbox)
-    # insert_info (conn, 25000)
-
-
-
-
-
-#insert_sdf (conn, sdf_dir)
-
-
-#cur.execute ("INSERT INTO sdf VALUES(?,?)", 
-#             (molob.data["PUBCHEM_COMPOUND_CID"],
-#              molob.write ("sdf")))
-#conn.commit()
-
-            # This version takes about 35s for 25000 molecules. 
-#            for mol in pybel.readfile ("sdf", sdf_fn):
-#                print ("Pubchem-ID: " + mol.data["PUBCHEM_COMPOUND_CID"])
-#                cur.execute ("INSERT INTO sdf VALUES(?,?)", 
-#                             (mol.data["PUBCHEM_COMPOUND_CID"],
-#                              mol.write ("sdf")))
-
-            # This loop takes about 23s for 25000 molecules.
-#            mol_sdf = pybel.readstring ("sdf", str (row[1]))
-#            conn.execute ("INSERT INTO info VALUES(?,?,?,?,?,?)",
-#                          (mol_cid, 
-#                           mol_sdf.data["PUBCHEM_EXACT_MASS"],
-#                           mol_sdf.data["PUBCHEM_IUPAC_INCHI"],
-#                           mol_sdf.data["PUBCHEM_OPENEYE_CAN_SMILES"],
-#                           mol_sdf.data["PUBCHEM_OPENEYE_ISO_SMILES"],
-#                           mol_sdf.data["PUBCHEM_MOLECULAR_FORMULA"]))
-# 
