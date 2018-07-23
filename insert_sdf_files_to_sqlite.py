@@ -492,6 +492,11 @@ if __name__ == "__main__":
                     os.path.basename(sdf_fn).split(".")[0].split("_")[1],
                     os.path.basename(sdf_fn).split(".")[0].split("_")[2]))
 
+        # Make the column 'monoisotopic_mass' an index column. Later, when we query by
+        # monoisotopic mass with ppm-window we _hugely_ speed up the query.
+        with conn:
+            conn.execute("CREATE INDEX idx_monoisotopic_mass ON info(monoisotopic_mass)")
+
     except sqlite3.ProgrammingError as err:
         print("Programming error: '" + err.args[0] + "'.")
     except sqlite3.DatabaseError as err:
