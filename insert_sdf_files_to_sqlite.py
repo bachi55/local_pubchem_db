@@ -195,7 +195,7 @@ def insert_info(db_connection, chunk_size=10000):
                 mol_sdf["PUBCHEM_IUPAC_NAME"],
                 mol_sdf["PUBCHEM_IUPAC_INCHI"],
                 mol_sdf["PUBCHEM_IUPAC_INCHIKEY"],
-                mol_sdf["PUBCHEM_XLOGP3_AA"],
+                mol_sdf["PUBCHEM_XLOGP3*"],
                 mol_sdf["PUBCHEM_MONOISOTOPIC_WEIGHT"],
                 mol_sdf["PUBCHEM_MOLECULAR_FORMULA"],
                 mol_sdf["PUBCHEM_OPENEYE_ISO_SMILES"]))
@@ -247,7 +247,7 @@ def insert_info_from_sdf_strings(db_connection, l_cid_sdf):
             mol_sdf["PUBCHEM_IUPAC_NAME"],
             mol_sdf["PUBCHEM_IUPAC_INCHI"],
             mol_sdf["PUBCHEM_IUPAC_INCHIKEY"],
-            mol_sdf["PUBCHEM_XLOGP3_AA"],
+            mol_sdf["PUBCHEM_XLOGP3*"],
             mol_sdf["PUBCHEM_MONOISOTOPIC_WEIGHT"],
             mol_sdf["PUBCHEM_MOLECULAR_FORMULA"],
             mol_sdf["PUBCHEM_OPENEYE_ISO_SMILES"]))
@@ -272,7 +272,7 @@ def extract_info_from_sdf(sdf):
         "PUBCHEM_IUPAC_NAME":          None,  # string
         "PUBCHEM_IUPAC_INCHI":         None,  # string
         "PUBCHEM_IUPAC_INCHIKEY":      None,  # string
-        "PUBCHEM_XLOGP3_AA":           None,  # float
+        "PUBCHEM_XLOGP3*":             None,  # float
         "PUBCHEM_MONOISOTOPIC_WEIGHT": None,  # float
         "PUBCHEM_MOLECULAR_FORMULA":   None,  # string
         "PUBCHEM_OPENEYE_ISO_SMILES":  None   # string
@@ -313,9 +313,22 @@ def extract_info_from_sdf(sdf):
             i = i+2
             continue
 
-        if not found["PUBCHEM_XLOGP3_AA"] and lines[i].find("PUBCHEM_XLOGP3_AA") != -1:
-            found["PUBCHEM_XLOGP3_AA"] = True
-            info["PUBCHEM_XLOGP3_AA"] = float(lines[i+1].strip())
+        # PubChem uses XLOGP3 and XLOGP3_AA without any distinction [1]. Therefore, here we search for both information
+        # PUBCHEM_XLOGP3 and PUBCHEM_XLOGP3_AA. We take PUBCHEM_XLOGP3 if it was found earlier.
+        #
+        #  - XLOGP3: 'standard' model [2]
+        #  - XLOGP3_AA: predicted logp using pure atom-additive model [2]
+        #
+        # [1]: http://www.sioc-ccbg.ac.cn/skins/ccbgwebsite/software/xlogp3/manual/XLOGP3_Manual.pdf
+        # [2]: ftp://ftp.ncbi.nlm.nih.gov/pubchem/specifications/pubchem_sdtags.pdf (page 9)
+        if not found["PUBCHEM_XLOGP3*"] and lines[i].find("PUBCHEM_XLOGP3") != -1:
+            found["PUBCHEM_XLOGP3*"] = True
+            info["PUBCHEM_XLOGP3*"] = float(lines[i+1].strip())
+            i = i+2
+            continue
+        if not found["PUBCHEM_XLOGP3*"] and lines[i].find("PUBCHEM_XLOGP3_AA") != -1:
+            found["PUBCHEM_XLOGP3*"] = True
+            info["PUBCHEM_XLOGP3*"] = float(lines[i+1].strip())
             i = i+2
             continue
 
@@ -338,7 +351,7 @@ def extract_info_from_sdf(sdf):
             continue
 
         i = i+1
-        
+
     return info
 
 
