@@ -470,16 +470,17 @@ if __name__ == "__main__":
         # Get a list of all sdf-files available and reduce it to the ones still
         # needed to be processed.
         sdf_files = glob.glob(sdf_dir + "*.sdf")
-        print("Sdf-files to process (before filtering): %d" % len(sdf_files))
+        n_sdf_files = len(sdf_files)
+        print("Sdf-files to process (before filtering): %d" % n_sdf_files)
 
         with conn:
             sdf_files = get_sdf_files_not_in_db(conn, sdf_files)
+        n_sdf_files = len(sdf_files)
+        print("Sdf-files to process (after filtering): %d" % n_sdf_files)
 
-        print("Sdf-files to process: %d" % len(sdf_files))
-
-        # Iterate over the sdf-fles and add them one by one
+        # Iterate over the sdf-files and add them one by one
         for ii, sdf_fn in enumerate(sdf_files):
-            print("Process sdf-file: %d/%d" % (ii + 1, len(sdf_files)))
+            print("Process sdf-file: %d/%d" % (ii + 1, n_sdf_files))
 
             # parse and insert current sdf-file
             with open(sdf_fn) as sdf_file, conn:
