@@ -399,6 +399,8 @@ def initialize_db(db_connection, add_sdf=True, add_info=True, add_sdf_file=True,
     :param reset: boolean, If 'True' tables in the database are dropped and recreated.
     """
 
+    # TODO: "CREATE TABLE IF NOT EXISTS ..." circumvents explicit determination of table existence.
+
     # Check whether 'sdf' exists:
     if add_sdf:
         cur = db_connection.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sdf'")
