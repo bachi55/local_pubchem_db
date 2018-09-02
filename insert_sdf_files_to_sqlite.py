@@ -240,17 +240,24 @@ def insert_info_from_sdf_strings(db_connection, l_cid_sdf):
             continue
 
         db_connection.execute("INSERT INTO info \
-                      (cid, iupac_name, iupac_inchi, iupac_inchikey, xlogp3, \
-                       monoisotopic_mass, molecular_formula, smiles) \
-                      VALUES(?,?,?,?,?,?,?,?)", (
+                      (cid, iupac_name, iupac_inchi, iupac_inchikey, inchikey1, xlogp3, \
+                       monoisotopic_mass, molecular_formula, smiles, atom_def_stereo_count, atom_udef_stereo_count, \
+                       bond_def_stereo_count, bond_udef_stereo_count) \
+                      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)", (
             cid,
             mol_sdf["PUBCHEM_IUPAC_NAME"],
             mol_sdf["PUBCHEM_IUPAC_INCHI"],
             mol_sdf["PUBCHEM_IUPAC_INCHIKEY"],
+            mol_sdf["INCHIKEY1"],
             mol_sdf["PUBCHEM_XLOGP3*"],
             mol_sdf["PUBCHEM_MONOISOTOPIC_WEIGHT"],
             mol_sdf["PUBCHEM_MOLECULAR_FORMULA"],
-            mol_sdf["PUBCHEM_OPENEYE_ISO_SMILES"]))
+            mol_sdf["PUBCHEM_OPENEYE_ISO_SMILES"],
+            mol_sdf["PUBCHEM_ATOM_DEF_STEREO_COUNT"],
+            mol_sdf["PUBCHEM_ATOM_UDEF_STEREO_COUNT"],
+            mol_sdf["PUBCHEM_BOND_DEF_STEREO_COUNT"],
+            mol_sdf["PUBCHEM_BOND_UDEF_STEREO_COUNT"]
+        ))
 
     db_connection.execute("COMMIT")
 
@@ -268,21 +275,26 @@ def extract_info_from_sdf(sdf):
     """
     
     info = {
-        "PUBCHEM_COMPOUND_CID":        None,  # integer
-        "PUBCHEM_IUPAC_NAME":          None,  # string
-        "PUBCHEM_IUPAC_INCHI":         None,  # string
-        "PUBCHEM_IUPAC_INCHIKEY":      None,  # string
-        "PUBCHEM_XLOGP3*":             None,  # float
-        "PUBCHEM_MONOISOTOPIC_WEIGHT": None,  # float
-        "PUBCHEM_MOLECULAR_FORMULA":   None,  # string
-        "PUBCHEM_OPENEYE_ISO_SMILES":  None   # string
+        "PUBCHEM_COMPOUND_CID":           None,  # integer
+        "PUBCHEM_IUPAC_NAME":             None,  # string
+        "PUBCHEM_IUPAC_INCHI":            None,  # string
+        "PUBCHEM_IUPAC_INCHIKEY":         None,  # string
+        "INCHIKEY1":                      None,  # string
+        "PUBCHEM_XLOGP3*":                None,  # float
+        "PUBCHEM_MONOISOTOPIC_WEIGHT":    None,  # float
+        "PUBCHEM_MOLECULAR_FORMULA":      None,  # string
+        "PUBCHEM_OPENEYE_ISO_SMILES":     None,  # string
+        "PUBCHEM_ATOM_DEF_STEREO_COUNT":  None,  # integer
+        "PUBCHEM_ATOM_UDEF_STEREO_COUNT": None,  # integer
+        "PUBCHEM_BOND_DEF_STEREO_COUNT":  None,  # integer
+        "PUBCHEM_BOND_UDEF_STEREO_COUNT": None   # integer
     }
     found = {key: False for key in info.keys()}
 
     lines = sdf.split("\n")
     n_line = len(lines)
     i = 0
-    
+
     while not all(found.values()) and i < (n_line - 1):
         # skip empty lines
         if not len(lines[i]):
@@ -309,7 +321,9 @@ def extract_info_from_sdf(sdf):
 
         if not found["PUBCHEM_IUPAC_INCHIKEY"] and lines[i].find("PUBCHEM_IUPAC_INCHIKEY") != -1:
             found["PUBCHEM_IUPAC_INCHIKEY"] = True
+            found["INCHIKEY1"] = True
             info["PUBCHEM_IUPAC_INCHIKEY"] = lines[i+1].strip()
+            info["INCHIKEY1"] = info["PUBCHEM_IUPAC_INCHIKEY"].split("-")[0]
             i = i+2
             continue
 
@@ -348,6 +362,26 @@ def extract_info_from_sdf(sdf):
             found["PUBCHEM_OPENEYE_ISO_SMILES"] = True
             info["PUBCHEM_OPENEYE_ISO_SMILES"] = lines[i+1].strip()
             i = i+2
+            continue
+
+        if not found["PUBCHEM_ATOM_DEF_STEREO_COUNT"] and lines[i].find("PUBCHEM_ATOM_DEF_STEREO_COUNT") != -1:
+            found["PUBCHEM_ATOM_DEF_STEREO_COUNT"] = True
+            info["PUBCHEM_ATOM_DEF_STEREO_COUNT"] = int(lines[i+1].strip())
+            continue
+
+        if not found["PUBCHEM_ATOM_UDEF_STEREO_COUNT"] and lines[i].find("PUBCHEM_ATOM_UDEF_STEREO_COUNT") != -1:
+            found["PUBCHEM_ATOM_UDEF_STEREO_COUNT"] = True
+            info["PUBCHEM_ATOM_UDEF_STEREO_COUNT"] = int(lines[i+1].strip())
+            continue
+
+        if not found["PUBCHEM_BOND_DEF_STEREO_COUNT"] and lines[i].find("PUBCHEM_BOND_DEF_STEREO_COUNT") != -1:
+            found["PUBCHEM_BOND_DEF_STEREO_COUNT"] = True
+            info["PUBCHEM_BOND_DEF_STEREO_COUNT"] = int(lines[i+1].strip())
+            continue
+
+        if not found["PUBCHEM_BOND_UDEF_STEREO_COUNT"] and lines[i].find("PUBCHEM_BOND_UDEF_STEREO_COUNT") != -1:
+            found["PUBCHEM_BOND_UDEF_STEREO_COUNT"] = True
+            info["PUBCHEM_BOND_UDEF_STEREO_COUNT"] = int(lines[i+1].strip())
             continue
 
         i = i+1
@@ -427,10 +461,16 @@ def initialize_db(db_connection, add_sdf=True, add_info=True, add_sdf_file=True,
                                              iupac_name          varchar                     , \
                                              iupac_inchi         varchar             not null, \
                                              iupac_inchikey      varchar                     , \
+                                             inchikey1           varchar                     , \
                                              xlogp3              real                        , \
                                              monoisotopic_mass   real                not null, \
                                              molecular_formula   varchar             not null, \
-                                             smiles              varchar);")
+                                             smiles              varchar                     , \
+                                             atom_def_stereo_count integer, \
+                                             atom_udef_stereo_count integer, \
+                                             bond_def_stereo_count integer, \
+                                             bond_udef_stereo_count integer);")
+
 
     # Check whether 'sdf_file' exsits:
     if add_sdf_file:
@@ -480,24 +520,30 @@ if __name__ == "__main__":
         n_sdf_files = len(sdf_files)
         print("Sdf-files to process (after filtering): %d" % n_sdf_files)
 
-        # Iterate over the sdf-files and add them one by one
-        for ii, sdf_fn in enumerate(sdf_files):
-            print("Process sdf-file: %d/%d" % (ii + 1, n_sdf_files))
+        if n_sdf_files > 0:
+            # Iterate over the sdf-files and add them one by one
+            for ii, sdf_fn in enumerate(sdf_files):
+                print("Process sdf-file: %d/%d" % (ii + 1, n_sdf_files))
 
-            # parse and insert current sdf-file
-            with open(sdf_fn) as sdf_file, conn:
-                insert_info_from_sdf_strings(conn, split_sdf_file(sdf_file))
+                # parse and insert current sdf-file
+                with open(sdf_fn) as sdf_file, conn:
+                    insert_info_from_sdf_strings(conn, split_sdf_file(sdf_file))
 
-                # add current sdf-file to the list of completed sdf-files
-                conn.execute("INSERT INTO sdf_file (filename, lowest_cid, highest_cid) VALUES(?,?,?)", (
-                    os.path.basename(sdf_fn),
-                    os.path.basename(sdf_fn).split(".")[0].split("_")[1],
-                    os.path.basename(sdf_fn).split(".")[0].split("_")[2]))
+                    # add current sdf-file to the list of completed sdf-files
+                    conn.execute("INSERT INTO sdf_file (filename, lowest_cid, highest_cid) VALUES(?,?,?)", (
+                        os.path.basename(sdf_fn),
+                        os.path.basename(sdf_fn).split(".")[0].split("_")[1],
+                        os.path.basename(sdf_fn).split(".")[0].split("_")[2]))
 
-        # Make the column 'monoisotopic_mass' an index column. Later, when we query by
-        # monoisotopic mass with ppm-window we _hugely_ speed up the query.
-        with conn:
-            conn.execute("CREATE INDEX idx_monoisotopic_mass ON info(monoisotopic_mass)")
+            # Make the column 'monoisotopic_mass' an index column. Later, when we query by
+            # monoisotopic mass with ppm-window we _hugely_ speed up the query.
+            with conn:
+                conn.execute("CREATE INDEX idx_monoisotopic_mass ON info(monoisotopic_mass)")
+
+            # Create an index on the inchikey1 to query stereo-isomers from the database given
+            # their 2D structure only.
+            with conn:
+                conn.execute("CREATE INDEX idx_inchikey1 ON info(inchikey1)")
 
     except sqlite3.ProgrammingError as err:
         print("Programming error: '" + err.args[0] + "'.")
