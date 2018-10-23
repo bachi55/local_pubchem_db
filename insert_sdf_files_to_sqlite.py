@@ -1,10 +1,11 @@
 import queue
 import glob
 import sqlite3
-import re  # Regular expression
 import os
 import sys
 from timeit import default_timer as timer
+
+from misc import split_sdf_file
 
 """
 This script can be used to parse a set of SDF files and add (some of) the
@@ -298,25 +299,25 @@ def extract_info_from_sdf(sdf):
     while not all(found.values()) and i < (n_line - 1):
         # skip empty lines
         if not len(lines[i]):
-            i = i+1
+            i = i + 1
             continue
 
         if not found["PUBCHEM_COMPOUND_CID"] and lines[i].find("PUBCHEM_COMPOUND_CID") != -1:
             found["PUBCHEM_COMPOUND_CID"] = True
             info["PUBCHEM_COMPOUND_CID"] = int(lines[i+1].strip())
-            i = i+2
+            i = i + 2
             continue
 
         if not found["PUBCHEM_IUPAC_NAME"] and lines[i].find("PUBCHEM_IUPAC_NAME") != -1:
             found["PUBCHEM_IUPAC_NAME"] = True
             info["PUBCHEM_IUPAC_NAME"] = lines[i+1].strip()
-            i = i+2
+            i = i + 2
             continue
 
         if not found["PUBCHEM_IUPAC_INCHI"] and lines[i].find("PUBCHEM_IUPAC_INCHI") != -1:
             found["PUBCHEM_IUPAC_INCHI"] = True
             info["PUBCHEM_IUPAC_INCHI"] = lines[i+1].strip()
-            i = i+2
+            i = i + 2
             continue
 
         if not found["PUBCHEM_IUPAC_INCHIKEY"] and lines[i].find("PUBCHEM_IUPAC_INCHIKEY") != -1:
@@ -324,7 +325,7 @@ def extract_info_from_sdf(sdf):
             found["INCHIKEY1"] = True
             info["PUBCHEM_IUPAC_INCHIKEY"] = lines[i+1].strip()
             info["INCHIKEY1"] = info["PUBCHEM_IUPAC_INCHIKEY"].split("-")[0]
-            i = i+2
+            i = i + 2
             continue
 
         # PubChem uses XLOGP3 and XLOGP3_AA without any distinction [1]. Therefore, here we search for both information
@@ -338,85 +339,59 @@ def extract_info_from_sdf(sdf):
         if not found["PUBCHEM_XLOGP3*"] and lines[i].find("PUBCHEM_XLOGP3") != -1:
             found["PUBCHEM_XLOGP3*"] = True
             info["PUBCHEM_XLOGP3*"] = float(lines[i+1].strip())
-            i = i+2
+            i = i + 2
             continue
         if not found["PUBCHEM_XLOGP3*"] and lines[i].find("PUBCHEM_XLOGP3_AA") != -1:
             found["PUBCHEM_XLOGP3*"] = True
             info["PUBCHEM_XLOGP3*"] = float(lines[i+1].strip())
-            i = i+2
+            i = i + 2
             continue
 
         if not found["PUBCHEM_MONOISOTOPIC_WEIGHT"] and lines[i].find("PUBCHEM_MONOISOTOPIC_WEIGHT") != -1:
             found["PUBCHEM_MONOISOTOPIC_WEIGHT"] = True
             info["PUBCHEM_MONOISOTOPIC_WEIGHT"] = float(lines[i+1].strip())
-            i = i+2
+            i = i + 2
             continue
 
         if not found["PUBCHEM_MOLECULAR_FORMULA"] and lines[i].find("PUBCHEM_MOLECULAR_FORMULA") != -1:
             found["PUBCHEM_MOLECULAR_FORMULA"] = True
             info["PUBCHEM_MOLECULAR_FORMULA"] = lines[i+1].strip()
-            i = i+2
+            i = i + 2
             continue
 
         if not found["PUBCHEM_OPENEYE_ISO_SMILES"] and lines[i].find("PUBCHEM_OPENEYE_ISO_SMILES") != -1:
             found["PUBCHEM_OPENEYE_ISO_SMILES"] = True
             info["PUBCHEM_OPENEYE_ISO_SMILES"] = lines[i+1].strip()
-            i = i+2
+            i = i + 2
             continue
 
         if not found["PUBCHEM_ATOM_DEF_STEREO_COUNT"] and lines[i].find("PUBCHEM_ATOM_DEF_STEREO_COUNT") != -1:
             found["PUBCHEM_ATOM_DEF_STEREO_COUNT"] = True
             info["PUBCHEM_ATOM_DEF_STEREO_COUNT"] = int(lines[i+1].strip())
+            i = i + 2
             continue
 
         if not found["PUBCHEM_ATOM_UDEF_STEREO_COUNT"] and lines[i].find("PUBCHEM_ATOM_UDEF_STEREO_COUNT") != -1:
             found["PUBCHEM_ATOM_UDEF_STEREO_COUNT"] = True
             info["PUBCHEM_ATOM_UDEF_STEREO_COUNT"] = int(lines[i+1].strip())
+            i = i + 2
             continue
 
         if not found["PUBCHEM_BOND_DEF_STEREO_COUNT"] and lines[i].find("PUBCHEM_BOND_DEF_STEREO_COUNT") != -1:
             found["PUBCHEM_BOND_DEF_STEREO_COUNT"] = True
             info["PUBCHEM_BOND_DEF_STEREO_COUNT"] = int(lines[i+1].strip())
+            i = i + 2
             continue
 
         if not found["PUBCHEM_BOND_UDEF_STEREO_COUNT"] and lines[i].find("PUBCHEM_BOND_UDEF_STEREO_COUNT") != -1:
             found["PUBCHEM_BOND_UDEF_STEREO_COUNT"] = True
             info["PUBCHEM_BOND_UDEF_STEREO_COUNT"] = int(lines[i+1].strip())
+            i = i + 2
             continue
 
-        i = i+1
+        i = i + 1
 
     return info
-
-
-def split_sdf_file(sdf_file_stream):
-    """
-    Split a sdf-file containing the information for several molecules into a 
-    list of (cid, sdf-string).
-    
-    :param sdf_file_stream: file stream, pointing to the sdf-file. Result of 'open'
-
-    :return: list of (cid, sdf-string)-tuples
-    """
-    sdf_lines = sdf_file_stream.read()
-    start = 0
-    sdfs = []
-
-    while True:
-        end_pos = sdf_lines.find("$$$$", start)
-        if end_pos == -1:
-            break
-
-        # Extract the sdf-string and the cid
-        sdf_str = sdf_lines[start:end_pos-1]
-        sdf_str = sdf_str.replace("'", "")
-        cid = int(re.findall("<PUBCHEM_COMPOUND_CID>\n([0-9]+)", sdf_str)[0])
-
-        sdfs.append((cid, sdf_str))
-
-        start = end_pos + 5
-
-    return sdfs
 
 
 def initialize_db(db_connection, add_sdf=True, add_info=True, add_sdf_file=True, reset=False):
@@ -490,7 +465,7 @@ def initialize_db(db_connection, add_sdf=True, add_info=True, add_sdf_file=True,
 
 if __name__ == "__main__":
 
-    if len(sys.argv) < 2:
+    if len(sys.argv) < 3:
         print("Usage: python %s <PUBCHEM_DB_BASEDIR> <RESET_DB>" % os.path.basename(sys.argv[0]))
         print("Example:")
         print("\t python %s /run/media/bach/Intenso/data/pubchem/ True" % os.path.basename(sys.argv[0]))
@@ -526,7 +501,7 @@ if __name__ == "__main__":
                 print("Process sdf-file: %d/%d" % (ii + 1, n_sdf_files))
 
                 # parse and insert current sdf-file
-                with open(sdf_fn) as sdf_file, conn:
+                with open(sdf_fn, "r") as sdf_file, conn:
                     insert_info_from_sdf_strings(conn, split_sdf_file(sdf_file))
 
                     # add current sdf-file to the list of completed sdf-files
