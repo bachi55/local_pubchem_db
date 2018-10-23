@@ -446,7 +446,6 @@ def initialize_db(db_connection, add_sdf=True, add_info=True, add_sdf_file=True,
                                              bond_def_stereo_count integer, \
                                              bond_udef_stereo_count integer);")
 
-
     # Check whether 'sdf_file' exsits:
     if add_sdf_file:
         cur = db_connection.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sdf_file'")
