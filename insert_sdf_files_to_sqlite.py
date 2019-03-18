@@ -1,4 +1,3 @@
-import queue
 import glob
 import sqlite3
 import os
@@ -56,102 +55,6 @@ Table creation: 'fp'
 """
 
 
-def insert_sdf(db_connection, sdf_directory, max_num_attempts=5):
-    """
-    Function to insert a set of sdf files into a database. The directory 
-    containing the sdf files is screened and all contained sdf files are 
-    processed.
-    
-    :param db_connection: sqlite3.Connection, to the pubchem database
-    :param sdf_directory: string, Path to the sdf-directory containing the pubchem sdf files
-    :param max_num_attempts: integer, number of tries to insert a single sdf file into the DB in case of an error
-    """
-   
-    # Get a list of all sdf-files available and reduce it to the ones still 
-    # needed to be processed.
-    sdf_filenames = glob.glob(sdf_directory + "*.sdf")
-    sdf_filenames = get_sdf_files_not_in_db(db_connection, sdf_filenames)
-    
-    # Add the sdf-files into a Queue to process them. Each sdf-file is stored
-    # together with an integer indicating how often this file was already tried 
-    # to be added to the DB. It can happen that there is an IO-Error and we need 
-    # to retry to add a sdf-file. However, we want to restrict the maximum 
-    # number of tries.
-    que_sdf_files = queue.Queue()
-    for sdf_filename in sdf_filenames:
-        que_sdf_files.put((sdf_filename, 0))
-        
-    que_sdf_files_failed = queue.Queue()
-    
-    n_files = que_sdf_files.qsize()
-    print("Sdf-files to process: %d" % n_files)
-
-    while not que_sdf_files.empty():                
-        start = timer()
-
-        # Open the sdf-file
-        sdf_filename, num_attempts = que_sdf_files.get()
-        try:
-            with open(sdf_filename) as sdf_file_stream:
-                molecules = split_sdf_file(sdf_file_stream)
-        except IOError as e:
-            print("An IOError occured: '" + os.strerror(e.args[0]) + "' when processing " +
-                  os.path.basename(sdf_filename) + ".")
-            
-            # Increase the number of attempts due to an unsuccessful try.
-            num_attempts = num_attempts + 1
-            if num_attempts < max_num_attempts:
-                # Enqueue the sdf-file again for a later try.
-                que_sdf_files.put((sdf_filename, num_attempts))
-            else: 
-                que_sdf_files_failed.put(sdf_filename)
-            
-            continue
-        
-        # Insert the sdfs into the database
-        try:
-            # Commit all molecules in a block to decrease the number of 
-            # transactions.
-            db_connection.execute("BEGIN")
-            # This version takes about 3s for 25000 molecules.
-            db_connection.executemany("INSERT INTO sdf VALUES(?,?)", molecules)
-            
-            db_connection.execute("INSERT INTO sdf_file (filename, lowest_cid, highest_cid) VALUES(?,?,?)", (
-                os.path.basename(sdf_filename),
-                os.path.basename(sdf_filename).split(".")[0].split("_")[1],
-                os.path.basename(sdf_filename).split(".")[0].split("_")[2]))
-            
-            db_connection.execute("COMMIT")
-        except sqlite3.ProgrammingError as error:
-            # Error caused by the programmer, e.g. incorrect query. This error 
-            # indicates a logical error, which needs to be fixed. 
-            print("A programming error occurred: '" + error.args[0] + "', when processing " +
-                  os.path.basename(sdf_filename) + ".")
-            db_connection.execute("ROLLBACK")
-            raise
-        except (sqlite3.OperationalError, sqlite3.InternalError) as error:
-            # Error caused by the database, e.g. lost connection, memory 
-            # allocation error, DB out of sync. We should re-try to add the 
-            # current sdf-file.
-            print("An operational / internal error occurred: '" + error.args[0] + "', when processing " +
-                  os.path.basename(sdf_filename) + ".")
-            db_connection.execute("ROLLBACK")
-            
-            # Increase the number of attempts due to an unsuccessful try.
-            num_attempts = num_attempts + 1
-            if num_attempts < max_num_attempts:
-                # Enqueue the sdf-file again for a later try.
-                que_sdf_files.put((sdf_filename, num_attempts))
-            else: 
-                que_sdf_files_failed.put(sdf_filename)
-            
-            continue 
-                
-        end = timer()
-        print("Processed: " + os.path.basename(sdf_filename) + " - " + str(round(end - start, 2)) + "sec (" +
-              str(que_sdf_files.qsize()) + " remain)")
-
-
 def get_sdf_files_not_in_db(db_connection, sdf_fn_in_folder):
     """
     Returns the sdf_file names (full path) which are not already in the DB.
@@ -163,61 +66,6 @@ def get_sdf_files_not_in_db(db_connection, sdf_fn_in_folder):
     sdf_files_in_db = [str(x[0]) for x in sdf_files_in_db]
                              
     return list(filter(lambda x: os.path.basename(x) not in sdf_files_in_db, sdf_fn_in_folder))
-
-
-def insert_info(db_connection, chunk_size=10000):
-    """
-    Insert the basic information of each molecule in the DB (represented using
-    its sdf-string) and insert those information into the 'info' table. 
-    
-    :param db_connection: sqlite3.Connection, database connection
-    :param chunk_size: integer, number of CIDs to insert into the DB with a COMMIT.
-    """
-    start = timer()
-    
-    try:
-        inserted_cids = 0
-
-        db_connection.execute("BEGIN")
-
-        for cid, sdf in db_connection.execute("SELECT cid, sdf_string FROM sdf"):
-
-            # Parse the sdf-string of the current molecule.        
-            # This loop takes about 8s for 25000 molecules.
-            mol_sdf = extract_info_from_sdf(sdf)
-
-            assert (cid == mol_sdf["PUBCHEM_COMPOUND_CID"])
-
-            db_connection.execute("INSERT INTO info \
-                          (cid, iupac_name, iupac_inchi, iupac_inchikey, xlogp3, \
-                           monoisotopic_mass, molecular_formula, smiles) \
-                          VALUES(?,?,?,?,?,?,?,?)", (
-                cid,
-                mol_sdf["PUBCHEM_IUPAC_NAME"],
-                mol_sdf["PUBCHEM_IUPAC_INCHI"],
-                mol_sdf["PUBCHEM_IUPAC_INCHIKEY"],
-                mol_sdf["PUBCHEM_XLOGP3*"],
-                mol_sdf["PUBCHEM_MONOISOTOPIC_WEIGHT"],
-                mol_sdf["PUBCHEM_MOLECULAR_FORMULA"],
-                mol_sdf["PUBCHEM_OPENEYE_ISO_SMILES"]))
-            
-            # One transaction encompasses 'chunk_size' molecules.
-            if inserted_cids == chunk_size:
-                inserted_cids = 0
-                print("Current CID: %d" % cid)
-
-                db_connection.execute("COMMIT")
-                db_connection.execute("BEGIN")
-            else:
-                inserted_cids = inserted_cids + 1
-                
-        db_connection.execute("COMMIT")
-    except sqlite3.Error as error:
-        print("An error occured: " + error.args[0])
-        db_connection.execute("ROLLBACK")
-            
-    end = timer()
-    print("Extraction and insertation of the information took %.3fsec" % (end - start))
 
 
 def insert_info_from_sdf_strings(db_connection, l_cid_sdf):
@@ -240,11 +88,11 @@ def insert_info_from_sdf_strings(db_connection, l_cid_sdf):
                 mol_sdf["PUBCHEM_MONOISOTOPIC_WEIGHT"] is None or mol_sdf["PUBCHEM_MOLECULAR_FORMULA"] is None:
             continue
 
-        db_connection.execute("INSERT INTO info \
-                      (cid, iupac_name, iupac_inchi, iupac_inchikey, inchikey1, xlogp3, \
-                       monoisotopic_mass, molecular_formula, smiles, atom_def_stereo_count, atom_udef_stereo_count, \
-                       bond_def_stereo_count, bond_udef_stereo_count) \
-                      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)", (
+        db_connection.execute("INSERT INTO info "
+                              "(cid, iupac_name, iupac_inchi, iupac_inchikey, inchikey1, xlogp3,"
+                              "monoisotopic_mass, molecular_formula, smiles, can_smiles, atom_def_stereo_count, "
+                              "atom_udef_stereo_count, bond_def_stereo_count, bond_udef_stereo_count) "
+                              "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (
             cid,
             mol_sdf["PUBCHEM_IUPAC_NAME"],
             mol_sdf["PUBCHEM_IUPAC_INCHI"],
@@ -254,11 +102,12 @@ def insert_info_from_sdf_strings(db_connection, l_cid_sdf):
             mol_sdf["PUBCHEM_MONOISOTOPIC_WEIGHT"],
             mol_sdf["PUBCHEM_MOLECULAR_FORMULA"],
             mol_sdf["PUBCHEM_OPENEYE_ISO_SMILES"],
+            mol_sdf["PUBCHEM_OPENEYE_CAN_SMILES"],
             mol_sdf["PUBCHEM_ATOM_DEF_STEREO_COUNT"],
             mol_sdf["PUBCHEM_ATOM_UDEF_STEREO_COUNT"],
             mol_sdf["PUBCHEM_BOND_DEF_STEREO_COUNT"],
-            mol_sdf["PUBCHEM_BOND_UDEF_STEREO_COUNT"]
-        ))
+            mol_sdf["PUBCHEM_BOND_UDEF_STEREO_COUNT"])
+        )
 
     db_connection.execute("COMMIT")
 
@@ -285,6 +134,7 @@ def extract_info_from_sdf(sdf):
         "PUBCHEM_MONOISOTOPIC_WEIGHT":    None,  # float
         "PUBCHEM_MOLECULAR_FORMULA":      None,  # string
         "PUBCHEM_OPENEYE_ISO_SMILES":     None,  # string
+        "PUBCHEM_OPENEYE_CAN_SMILES":     None,  # string
         "PUBCHEM_ATOM_DEF_STEREO_COUNT":  None,  # integer
         "PUBCHEM_ATOM_UDEF_STEREO_COUNT": None,  # integer
         "PUBCHEM_BOND_DEF_STEREO_COUNT":  None,  # integer
@@ -365,6 +215,12 @@ def extract_info_from_sdf(sdf):
             i = i + 2
             continue
 
+        if not found["PUBCHEM_OPENEYE_CAN_SMILES"] and lines[i].find("PUBCHEM_OPENEYE_CAN_SMILES") != -1:
+            found["PUBCHEM_OPENEYE_CAN_SMILES"] = True
+            info["PUBCHEM_OPENEYE_CAN_SMILES"] = lines[i + 1].strip()
+            i = i + 2
+            continue
+
         if not found["PUBCHEM_ATOM_DEF_STEREO_COUNT"] and lines[i].find("PUBCHEM_ATOM_DEF_STEREO_COUNT") != -1:
             found["PUBCHEM_ATOM_DEF_STEREO_COUNT"] = True
             info["PUBCHEM_ATOM_DEF_STEREO_COUNT"] = int(lines[i+1].strip())
@@ -394,72 +250,40 @@ def extract_info_from_sdf(sdf):
     return info
 
 
-def initialize_db(db_connection, add_sdf=True, add_info=True, add_sdf_file=True, reset=False):
+def initialize_db(db_connection, reset=False):
     """
     Initialization of the DB: 
         - Remove existing tables if desired.
         - Create not present tables. 
         
     :param db_connection: sqlite3.Connection, connection to the database to modify.
-    :param add_sdf: boolean, should the sdf table be added containing the fill sdf-string for each CID
-    :param add_info: boolean, should the info table be added containing information from the parsed sdf-strings for each
-        CID
-    :param add_sdf_file: boolean, should the sdf_file table be added containing the filenames of all processed sdf-files
     :param reset: boolean, If 'True' tables in the database are dropped and recreated.
     """
+    if not reset:
+        return
 
-    # TODO: "CREATE TABLE IF NOT EXISTS ..." circumvents explicit determination of table existence.
+    db_connection.execute("DROP TABLE IF EXISTS sdf_file")
+    db_connection.execute("CREATE TABLE sdf_file("
+                          "filename     varchar primary key,"
+                          "lowest_cid   integer,"
+                          "highest_cid  integer);")
 
-    # Check whether 'sdf' exists:
-    if add_sdf:
-        cur = db_connection.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sdf'")
-        len_cur = len(cur.fetchall())
-
-        if reset & (len_cur > 0):
-            db_connection.execute("DROP TABLE sdf")
-            len_cur = 0
-
-        if len_cur == 0:
-            db_connection.execute("CREATE TABLE sdf(cid integer primary key, sdf_string varchar)")
-
-    # Check whether 'info' exists:
-    if add_info:
-        cur = db_connection.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='info'")
-        len_cur = len(cur.fetchall())
-
-        if reset & (len_cur > 0):
-            db_connection.execute("DROP TABLE info")
-            len_cur = 0
-
-        if len_cur == 0:
-            db_connection.execute("CREATE TABLE info(cid         integer primary key not null, \
-                                             iupac_name          varchar                     , \
-                                             iupac_inchi         varchar             not null, \
-                                             iupac_inchikey      varchar                     , \
-                                             inchikey1           varchar                     , \
-                                             xlogp3              real                        , \
-                                             monoisotopic_mass   real                not null, \
-                                             molecular_formula   varchar             not null, \
-                                             smiles              varchar                     , \
-                                             atom_def_stereo_count integer, \
-                                             atom_udef_stereo_count integer, \
-                                             bond_def_stereo_count integer, \
-                                             bond_udef_stereo_count integer);")
-
-    # Check whether 'sdf_file' exsits:
-    if add_sdf_file:
-        cur = db_connection.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sdf_file'")
-        len_cur = len(cur.fetchall())
-
-        if reset & (len_cur > 0):
-            db_connection.execute("DROP TABLE sdf_file")
-            len_cur = 0
-
-        if len_cur == 0:
-            db_connection.execute("CREATE TABLE sdf_file(filename        varchar primary key, \
-                                                 lowest_cid              integer,             \
-                                                 highest_cid             integer              \
-                                                );")
+    db_connection.execute("DROP TABLE IF EXISTS info")
+    db_connection.execute("CREATE TABLE info("
+                          "cid                     integer primary key not null,"
+                          "iupac_name              varchar                     ,"
+                          "iupac_inchi             varchar             not null,"
+                          "iupac_inchikey          varchar                     ,"
+                          "inchikey1               varchar                     ,"
+                          "xlogp3                  real                        ,"
+                          "monoisotopic_mass       real                not null,"
+                          "molecular_formula       varchar             not null,"
+                          "smiles                  varchar                     ,"
+                          "can_smiles              varchar,"
+                          "atom_def_stereo_count   integer,"
+                          "atom_udef_stereo_count  integer,"
+                          "bond_def_stereo_count   integer,"
+                          "bond_udef_stereo_count  integer);")
 
 
 if __name__ == "__main__":
@@ -481,7 +305,7 @@ if __name__ == "__main__":
     try:
         # Initialize the database
         with conn:
-            initialize_db(conn, add_sdf=False, reset=reset_database)
+            initialize_db(conn, reset=reset_database)
 
         # Get a list of all sdf-files available and reduce it to the ones still
         # needed to be processed.
