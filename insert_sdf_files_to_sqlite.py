@@ -11,47 +11,6 @@ This script can be used to parse a set of SDF files and add (some of) the
 content to a SQLite database.
 
 This code is based on Huibin's implementation.
-
-Database layout: 
-    DB: pubchem --> TABLE-1: 'sdf', contains the sdf files for each compound-id
-                --> TABLE-2: 'info', contains several information for each 
-                                     compound-id, e.g. exact mass, mol-formula, 
-                                     ...
-                --> TABLE-3: 'fp', contains the fingerprint-vectors for each 
-                                   compound.
-                --> TABLE-4: 'sdf_file', contains the filenames of the 
-                                         sdf-files successfully added to the 
-                                         DB.
-"""
-
-"""
-Table creation: 'sdf_file'
-    create table sdf_file(filename                 varchar primary key,
-                          last_modification        real, 
-                          last_modification_ctime  varchar, 
-                          lowest_cid               integer, 
-                          highest_cid              integer
-                         );
-Table creation: 'sdf'
-    create table sdf(cid integer primary key, sdf_string varchar);
-Table creation: 'info'
-    create table info(cid               integer primary key, 
-                      name              varchar,
-                      exact_mass        real, 
-                      inchi             varchar,
-                      smiles_canonical  varchar,
-                      smiles            varchar,
-                      molecular_formula varchar
-                      );
-Table creation: 'fp'
-    create table fp(cid               integer primary key,
-                    cdk_substructure  varchar,
-                    pubchem           varchar,
-                    klekota_roth      varchar,
-                    fp3               varchar,
-                    maccs             varchar,
-                    fp4               varchar,
-                   );
 """
 
 
@@ -342,6 +301,10 @@ if __name__ == "__main__":
             # their 2D structure only.
             with conn:
                 conn.execute("CREATE INDEX idx_inchikey1 ON info(inchikey1)")
+
+            # Create an index on the inchi's
+            with conn:
+                conn.execute("CREATE INDEX idx_inchi on info(iupac_inchi)")
 
     except sqlite3.ProgrammingError as err:
         print("Programming error: '" + err.args[0] + "'.")
