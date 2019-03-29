@@ -260,7 +260,7 @@ if __name__ == "__main__":
     db_dir = basedir + "/db/"
 
     # Connect to the 'pubchem' database.
-    conn = sqlite3.connect(db_dir + "/pubchem.db", isolation_level=None)
+    conn = sqlite3.connect(db_dir + "/pubchem_290319.db", isolation_level=None)
     try:
         # Initialize the database
         with conn:
@@ -296,15 +296,23 @@ if __name__ == "__main__":
             # monoisotopic mass with ppm-window we _hugely_ speed up the query.
             with conn:
                 conn.execute("CREATE INDEX idx_monoisotopic_mass ON info(monoisotopic_mass)")
+            print("Create index on monoisotopic mass.")
 
             # Create an index on the inchikey1 to query stereo-isomers from the database given
             # their 2D structure only.
             with conn:
                 conn.execute("CREATE INDEX idx_inchikey1 ON info(inchikey1)")
+            print("Create index on inchikey1.")
 
             # Create an index on the inchi's
             with conn:
-                conn.execute("CREATE INDEX idx_inchi on info(iupac_inchi)")
+                conn.execute("CREATE INDEX idx_inchi ON info(iupac_inchi)")
+            print("Create index on inchi.")
+
+            # Create an index on the molecular formula
+            with conn:
+                conn.execute("CREATE INDEX idx_molecular_formula ON info(molecular_formula)")
+            print("Create index on molecular formula.")
 
     except sqlite3.ProgrammingError as err:
         print("Programming error: '" + err.args[0] + "'.")
