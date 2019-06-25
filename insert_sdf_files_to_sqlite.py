@@ -2,6 +2,11 @@ import glob
 import sqlite3
 import os
 import sys
+import gzip
+import traceback
+import argparse
+
+from datetime import datetime
 from timeit import default_timer as timer
 
 from misc import split_sdf_file
@@ -245,22 +250,35 @@ def initialize_db(db_connection, reset=False):
                           "bond_udef_stereo_count  integer);")
 
 
-if __name__ == "__main__":
+def main():
+    arg_parser = argparse.ArgumentParser()
 
-    if len(sys.argv) < 3:
-        print("Usage: python %s <PUBCHEM_DB_BASEDIR> <RESET_DB>" % os.path.basename(sys.argv[0]))
-        print("Example:")
-        print("\t python %s /run/media/bach/Intenso/data/pubchem/ True" % os.path.basename(sys.argv[0]))
-        exit(1)
+    # Required arguments:
+    arg_parser.add_argument("base_dir", type=str,
+                            help="Base-directory containing containing the 'db/' and 'sdf/' folders.")
 
-    basedir = sys.argv[1]
-    reset_database = eval(sys.argv[2])
+    # Arguments with defaults:
+    arg_parser.add_argument("--gzip", action="store_true",
+                            help="If true, sdf-files are assumed to be compressed using gzip and do have file extension"
+                                 "'.gz'.")
+    arg_parser.add_argument("--reset", action="store_true",
+                            help="If true, all existing tables will be deleted and the DB will be re-computed.")
 
-    sdf_dir = basedir + "/sdf/"
-    db_dir = basedir + "/db/"
+    # Parse arguments:
+    args = arg_parser.parse_args()
+
+    reset_database = args.reset
+    use_gzip = args.gzip
+    if use_gzip:
+        sdf_opener = lambda fn: gzip.open(fn, "rt")
+    else:
+        sdf_opener = lambda fn: open(fn, "r")
+
+    sdf_dir = os.path.join(args.base_dir, "sdf")
+    db_dir = os.path.join(args.base_dir, "db")
 
     # Connect to the 'pubchem' database.
-    conn = sqlite3.connect(db_dir + "/pubchem_290319.db", isolation_level=None)
+    conn = sqlite3.connect(os.path.join(db_dir, "pubchem_" + str(datetime.now().date()) + ".db"))
     try:
         # Initialize the database
         with conn:
@@ -268,7 +286,8 @@ if __name__ == "__main__":
 
         # Get a list of all sdf-files available and reduce it to the ones still
         # needed to be processed.
-        sdf_files = glob.glob(sdf_dir + "*.sdf")
+        fn_patter = "*.sdf.gz" if use_gzip else "*.sdf"
+        sdf_files = glob.glob(os.path.join(sdf_dir, fn_patter))
         n_sdf_files = len(sdf_files)
         print("Sdf-files to process (before filtering): %d" % n_sdf_files)
 
@@ -283,7 +302,7 @@ if __name__ == "__main__":
                 print("Process sdf-file: %d/%d" % (ii + 1, n_sdf_files))
 
                 # parse and insert current sdf-file
-                with open(sdf_fn, "r") as sdf_file, conn:
+                with sdf_opener(sdf_fn) as sdf_file, conn:
                     insert_info_from_sdf_strings(conn, split_sdf_file(sdf_file))
 
                     # add current sdf-file to the list of completed sdf-files
@@ -314,13 +333,29 @@ if __name__ == "__main__":
                 conn.execute("CREATE INDEX idx_molecular_formula ON info(molecular_formula)")
             print("Create index on molecular formula.")
 
+            return_code = 0
+
     except sqlite3.ProgrammingError as err:
         print("Programming error: '" + err.args[0] + "'.")
+        traceback.print_exc()
+        return_code = 1
     except sqlite3.DatabaseError as err:
         print("Database error: '" + err.args[0] + "'.")
+        traceback.print_exc()
+        return_code = 1
     except IOError as err:
         print("An IOError occurred: '" + os.strerror(err.args[0]) + "'.")
+        traceback.print_exc()
+        return_code = 1
     except Exception as err:
         print(err.args[0])
+        traceback.print_exc()
+        return_code = 1
     finally:
         conn.close()
+
+    return return_code
+
+
+if __name__ == "__main__":
+    sys.exit(main())
