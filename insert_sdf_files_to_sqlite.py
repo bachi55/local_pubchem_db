@@ -279,6 +279,7 @@ def main():
 
     # Connect to the 'pubchem' database.
     conn = sqlite3.connect(os.path.join(db_dir, "pubchem_" + str(datetime.now().date()) + ".db"))
+
     try:
         # Initialize the database
         with conn:
@@ -299,7 +300,7 @@ def main():
         if n_sdf_files > 0:
             # Iterate over the sdf-files and add them one by one
             for ii, sdf_fn in enumerate(sdf_files):
-                print("Process sdf-file: %d/%d" % (ii + 1, n_sdf_files))
+                print("Process sdf-file: %s (%d/%d)" % (os.path.basename(sdf_fn), ii + 1, n_sdf_files))
 
                 # parse and insert current sdf-file
                 with sdf_opener(sdf_fn) as sdf_file, conn:
@@ -311,29 +312,29 @@ def main():
                         os.path.basename(sdf_fn).split(".")[0].split("_")[1],
                         os.path.basename(sdf_fn).split(".")[0].split("_")[2]))
 
-            # Make the column 'monoisotopic_mass' an index column. Later, when we query by
-            # monoisotopic mass with ppm-window we _hugely_ speed up the query.
-            with conn:
-                conn.execute("CREATE INDEX idx_monoisotopic_mass ON info(monoisotopic_mass)")
-            print("Create index on monoisotopic mass.")
+        # Make the column 'monoisotopic_mass' an index column. Later, when we query by
+        # monoisotopic mass with ppm-window we _hugely_ speed up the query.
+        with conn:
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_monoisotopic_mass ON info(monoisotopic_mass)")
+        print("Create index on monoisotopic mass.")
 
-            # Create an index on the inchikey1 to query stereo-isomers from the database given
-            # their 2D structure only.
-            with conn:
-                conn.execute("CREATE INDEX idx_inchikey1 ON info(inchikey1)")
-            print("Create index on inchikey1.")
+        # Create an index on the inchikey1 to query stereo-isomers from the database given
+        # their 2D structure only.
+        with conn:
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_inchikey1 ON info(inchikey1)")
+        print("Create index on inchikey1.")
 
-            # Create an index on the inchi's
-            with conn:
-                conn.execute("CREATE INDEX idx_inchi ON info(iupac_inchi)")
-            print("Create index on inchi.")
+        # Create an index on the inchi's
+        with conn:
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_inchi ON info(iupac_inchi)")
+        print("Create index on inchi.")
 
-            # Create an index on the molecular formula
-            with conn:
-                conn.execute("CREATE INDEX idx_molecular_formula ON info(molecular_formula)")
-            print("Create index on molecular formula.")
+        # Create an index on the molecular formula
+        with conn:
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_molecular_formula ON info(molecular_formula)")
+        print("Create index on molecular formula.")
 
-            return_code = 0
+        return_code = 0
 
     except sqlite3.ProgrammingError as err:
         print("Programming error: '" + err.args[0] + "'.")
