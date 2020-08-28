@@ -1,0 +1,58 @@
+{
+    "columns": {
+        "cid": {
+            "SD_TAG": ["PUBCHEM_COMPOUND_CID"],
+            "DTYPE": "integer",
+            "NOT_NULL": true,
+            "PRIMARY_KEY": true
+        },
+        "InChIKey": {
+            "SD_TAG": ["PUBCHEM_IUPAC_INCHIKEY"],
+            "DTYPE": "string",
+            "NOT_NULL": true,
+            "HAS_INDEX": true
+        },
+        "InChI": {
+            "SD_TAG": ["PUBCHEM_IUPAC_INCHI"],
+            "DTYPE": "string",
+            "NOT_NULL": true
+        },
+        "SMILES_CAN": {
+            "SD_TAG": ["PUBCHEM_OPENEYE_CAN_SMILES"],
+            "DTYPE": "string",
+            "NOT_NULL": true
+        },
+        "SMILES_ISO": {
+            "SD_TAG": ["PUBCHEM_OPENEYE_ISO_SMILES"],
+            "DTYPE": "string",
+            "NOT_NULL": true
+        },
+        "xlogp3": {
+            "SD_TAG": ["PUBCHEM_XLOGP3", "PUBCHEM_XLOGP3_AA"],
+            "DTYPE": "real",
+            "NOT_NULL": false
+        },
+        "exact_mass": {
+            "SD_TAG": ["PUBCHEM_EXACT_MASS"],
+            "DTYPE": "real",
+            "NOT_NULL": true,
+            "HAS_INDEX": true
+        },
+        "molecular_weight": {
+            "SD_TAG": ["PUBCHEM_MOLECULAR_WEIGHT"],
+            "DTYPE": "real",
+            "NOT_NULL": true
+        },
+        "molecular_formula": {
+            "SD_TAG": ["PUBCHEM_MOLECULAR_FORMULA"],
+            "DTYPE": "string",
+            "NOT_NULL": true,
+            "HAS_INDEX": true
+        },
+        "InChIKey1": {
+            "DTYPE": "string",
+            "NOT_NULL": true,
+            "HAS_INDEX": true
+        }
+    }
+}

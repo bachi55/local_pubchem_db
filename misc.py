@@ -1,4 +1,70 @@
 import re
+import json
+
+
+def load_db_specifications(fn):
+    """
+    Loads a database layout specified in a json-file into a dictionary.
+
+    :param fn: string, path to the json-file specifying the database layout. See 'default_db_layout.json' as an example.
+
+    :return: dictionary
+    """
+    with open(fn, "r") as json_file:
+        specs = json.loads(json_file.read())
+    return specs
+
+
+def get_column_stmt(column_specs):
+    stmt_columns = []
+
+    has_primary_key = False  # Primary keys must (if) be defined on a single column.
+
+    for name, spec in column_specs.items():
+        new_col = [name, spec["DTYPE"]]
+
+        if spec.get("NOT_NULL", True):
+            new_col.append("not null")
+
+        if spec.get("PRIMARY_KEY", False):
+            if has_primary_key:
+                raise ValueError("Primary keys must be defined on a single column.")
+
+            new_col.append("primary key")
+            has_primary_key = True
+
+        stmt_columns.append(" ".join(new_col))
+
+    return ",".join(stmt_columns)
+
+
+def initialize_db(db_connection, specs, reset=False):
+    """
+    Initialization of the DB:
+        - Remove existing tables if desired.
+        - Create not present tables.
+
+    :param db_connection: sqlite3.Connection, connection to the database to modify.
+
+    :param specs: dictionary, specifying the database layout, e.g. columns, primary key and indices.
+        See: 'load_db_specifications' for details.
+
+    :param reset: boolean, If 'True' tables in the database are dropped and recreated.
+    """
+    if not reset:
+        return
+
+    # Table to keep track about the sdf-chucks (files) included
+    db_connection.execute("DROP TABLE IF EXISTS sdf_file")
+    db_connection.execute("CREATE TABLE sdf_file("
+                          "filename          VARCHAR PRIMARY KEY,"
+                          "lowest_cid        INTEGER,"
+                          "highest_cid       INTEGER,"
+                          "last_modification REAL)")
+
+    # Table containing the compounds
+    db_connection.execute("DROP TABLE IF EXISTS compounds")
+    db_connection.execute("CREATE TABLE compounds(%s)" % get_column_stmt(specs["columns"]))
 
 
 def split_sdf_file(sdf_file_stream):

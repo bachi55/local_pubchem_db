@@ -5,11 +5,12 @@ import sys
 import gzip
 import traceback
 import argparse
+import json
 
 from datetime import datetime
 from timeit import default_timer as timer
 
-from misc import split_sdf_file
+from misc import split_sdf_file, initialize_db, load_db_specifications
 
 """
 This script can be used to parse a set of SDF files and add (some of) the
@@ -52,6 +53,7 @@ def insert_info_from_sdf_strings(db_connection, l_cid_sdf):
                 mol_sdf["PUBCHEM_MONOISOTOPIC_WEIGHT"] is None or mol_sdf["PUBCHEM_MOLECULAR_FORMULA"] is None:
             continue
 
+        # TODO: Use execute many here. This should remove the need to explicitly have a begin statement here
         db_connection.execute("INSERT INTO info "
                               "(cid, iupac_name, iupac_inchi, iupac_inchikey, inchikey1, xlogp3,"
                               "monoisotopic_mass, molecular_formula, smiles, can_smiles, atom_def_stereo_count, "
@@ -214,42 +216,6 @@ def extract_info_from_sdf(sdf):
     return info
 
 
-def initialize_db(db_connection, reset=False):
-    """
-    Initialization of the DB: 
-        - Remove existing tables if desired.
-        - Create not present tables. 
-        
-    :param db_connection: sqlite3.Connection, connection to the database to modify.
-    :param reset: boolean, If 'True' tables in the database are dropped and recreated.
-    """
-    if not reset:
-        return
-
-    db_connection.execute("DROP TABLE IF EXISTS sdf_file")
-    db_connection.execute("CREATE TABLE sdf_file("
-                          "filename     varchar primary key,"
-                          "lowest_cid   integer,"
-                          "highest_cid  integer);")
-
-    db_connection.execute("DROP TABLE IF EXISTS info")
-    db_connection.execute("CREATE TABLE info("
-                          "cid                     integer primary key not null,"
-                          "iupac_name              varchar                     ,"
-                          "iupac_inchi             varchar             not null,"
-                          "iupac_inchikey          varchar                     ,"
-                          "inchikey1               varchar                     ,"
-                          "xlogp3                  real                        ,"
-                          "monoisotopic_mass       real                not null,"
-                          "molecular_formula       varchar             not null,"
-                          "smiles                  varchar                     ,"
-                          "can_smiles              varchar,"
-                          "atom_def_stereo_count   integer,"
-                          "atom_udef_stereo_count  integer,"
-                          "bond_def_stereo_count   integer,"
-                          "bond_udef_stereo_count  integer);")
-
-
 def main():
     arg_parser = argparse.ArgumentParser()
 
@@ -257,23 +223,28 @@ def main():
     arg_parser.add_argument("base_dir", type=str,
                             help="Base-directory containing containing the 'db/' and 'sdf/' folders.")
 
-    # Arguments with defaults:
+    # Optional arguments
     arg_parser.add_argument("--gzip", action="store_true",
                             help="If true, sdf-files are assumed to be compressed using gzip and do have file extension"
                                  "'.gz'.")
     arg_parser.add_argument("--reset", action="store_true",
-                            help="If true, all existing tables will be deleted and the DB will be re-computed.")
+                            help="If true, all existing tables will be deleted and the DB will be re-build.")
+    arg_parser.add_argument("--db_layout_fn", type=str, default="./default_db_layout.json",
+                            help="JSON-file specifying the database layout.")
 
     # Parse arguments:
     args = arg_parser.parse_args()
 
-    reset_database = args.reset
-    use_gzip = args.gzip
-    if use_gzip:
+    # Which SDF reader to use
+    if args.gzip:
         sdf_opener = lambda fn: gzip.open(fn, "rt")
     else:
         sdf_opener = lambda fn: open(fn, "r")
 
+    # Load the DB layout
+    db_specs = load_db_specifications(args.db_layout_fn)
+
+    # Directory paths to the SDF and output DB file
     sdf_dir = os.path.join(args.base_dir, "sdf")
     db_dir = os.path.join(args.base_dir, "db")
 
@@ -283,11 +254,11 @@ def main():
     try:
         # Initialize the database
         with conn:
-            initialize_db(conn, reset=reset_database)
+            initialize_db(conn, db_specs, reset=args.reset)
 
         # Get a list of all sdf-files available and reduce it to the ones still
         # needed to be processed.
-        fn_patter = "*.sdf.gz" if use_gzip else "*.sdf"
+        fn_patter = "*.sdf.gz" if args.gzip else "*.sdf"
         sdf_files = glob.glob(os.path.join(sdf_dir, fn_patter))
         n_sdf_files = len(sdf_files)
         print("Sdf-files to process (before filtering): %d" % n_sdf_files)
@@ -352,6 +323,7 @@ def main():
         print(err.args[0])
         traceback.print_exc()
         return_code = 1
+
     finally:
         conn.close()
 
