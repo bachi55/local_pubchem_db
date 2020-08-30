@@ -51,6 +51,7 @@
         },
         "InChIKey1": {
             "DTYPE": "string",
+            "DATA_ORIGIN": "InChIKey",
             "NOT_NULL": true,
             "HAS_INDEX": true
         }
