@@ -8,23 +8,23 @@
         },
         "InChIKey": {
             "SD_TAG": ["PUBCHEM_IUPAC_INCHIKEY"],
-            "DTYPE": "string",
+            "DTYPE": "varchar",
             "NOT_NULL": true,
-            "HAS_INDEX": true
+            "WITH_INDEX": true
         },
         "InChI": {
             "SD_TAG": ["PUBCHEM_IUPAC_INCHI"],
-            "DTYPE": "string",
+            "DTYPE": "varchar",
             "NOT_NULL": true
         },
         "SMILES_CAN": {
             "SD_TAG": ["PUBCHEM_OPENEYE_CAN_SMILES"],
-            "DTYPE": "string",
+            "DTYPE": "varchar",
             "NOT_NULL": true
         },
         "SMILES_ISO": {
             "SD_TAG": ["PUBCHEM_OPENEYE_ISO_SMILES"],
-            "DTYPE": "string",
+            "DTYPE": "varchar",
             "NOT_NULL": true
         },
         "xlogp3": {
@@ -36,7 +36,7 @@
             "SD_TAG": ["PUBCHEM_EXACT_MASS"],
             "DTYPE": "real",
             "NOT_NULL": true,
-            "HAS_INDEX": true
+            "WITH_INDEX": true
         },
         "molecular_weight": {
             "SD_TAG": ["PUBCHEM_MOLECULAR_WEIGHT"],
@@ -45,15 +45,9 @@
         },
         "molecular_formula": {
             "SD_TAG": ["PUBCHEM_MOLECULAR_FORMULA"],
-            "DTYPE": "string",
+            "DTYPE": "varchar",
             "NOT_NULL": true,
-            "HAS_INDEX": true
-        },
-        "InChIKey1": {
-            "DTYPE": "string",
-            "DATA_ORIGIN": "InChIKey",
-            "NOT_NULL": true,
-            "HAS_INDEX": true
+            "WITH_INDEX": true
         }
     }
 }

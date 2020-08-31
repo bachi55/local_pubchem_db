@@ -93,18 +93,19 @@ def main():
                     insert_info_from_sdf_strings(conn, db_specs, iter_sdf_file(sdf_file))
 
                     # add current sdf-file to the list of completed sdf-files
-                    conn.execute("INSERT INTO sdf_file (filename, lowest_cid, highest_cid) VALUES(?,?,?)", (
+                    conn.execute("INSERT INTO sdf_file (filename, lowest_cid, highest_cid) "
+                                 "  VALUES(?,?,?,?)", (
                         os.path.basename(sdf_fn),
                         os.path.basename(sdf_fn).split(".")[0].split("_")[1],
                         os.path.basename(sdf_fn).split(".")[0].split("_")[2]))
 
         # Create indices after all sdf-files have been parsed and imported to the database.
         for colname, specs in db_specs["columns"].items():
-            if specs["HAS_INDEX"]:
+            if specs.get("WITH_INDEX", False):
                 idx_name = "idx_%s" % colname
                 with conn:
-                    conn.execute("DROP INDEX IF EXISTS ?", (idx_name, ))
-                    conn.execute("CREATE INDEX ? ON info(?)", (idx_name, colname))
+                    conn.execute("DROP INDEX IF EXISTS %s" % idx_name)
+                    conn.execute("CREATE INDEX %s ON compounds(%s)" % (idx_name, colname))
                 print("Create index on '%s'." % colname)
 
         return_code = 0

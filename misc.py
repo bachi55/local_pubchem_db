@@ -5,6 +5,26 @@ from collections import OrderedDict
 from timeit import default_timer as timer
 
 
+def _as_dtype(val, dtype):
+    """
+    Convert a value represented using a string variable to the desired output data-type.
+
+    :param val:
+    :param dtype:
+    :return:
+    """
+    if dtype in ["integer", "int"]:
+        oval = int(val)
+    elif dtype in ["real", "float", "double"]:
+        oval = float(val)
+    elif dtype in ["varchar", "character", "text"]:
+        oval = val
+    else:
+        raise ValueError("Invalid dtype: %s." % dtype)
+
+    return oval
+
+
 def extract_info_from_sdf(sdf, db_specs):
     """
     Extract the information for a given molecules from its sdf-string.
@@ -15,17 +35,13 @@ def extract_info_from_sdf(sdf, db_specs):
 
     :return: OrderedDict, containing the extracted information.
     """
-    infos, found = OrderedDict(), OrderedDict()
-    for k in db_specs["columns"]:
-        infos[k] = None
-        found[k] = False
-    # TODO: Can we get rid of this found dictionary here?
+    infos = OrderedDict([(k, None) for k in db_specs["columns"]])
 
     lines = sdf.split("\n")
     n_line = len(lines)
     i = 0
 
-    while not all(found.values()) and i < (n_line - 1):
+    while any([v is None for v in infos.values()]) and i < (n_line - 1):
         # skip empty lines
         if not len(lines[i]):
             i += 1
@@ -34,40 +50,21 @@ def extract_info_from_sdf(sdf, db_specs):
         # Check whether the current line contains any required information
         found_info_in_line = False
         for info in infos:
-            if not found[info]:
-                dtype = db_specs[info]["DTYPE"].lower()  # type of the information associated with the SD-tag
+            if infos[info] is None:
+                dtype = db_specs["columns"][info]["DTYPE"].lower()  # type of the information associated with the SD-tag
 
-                for sd_tag in db_specs[info]["SD_TAG"]:
+                for sd_tag in db_specs["columns"][info]["SD_TAG"]:
                     if lines[i].find(sd_tag) != -1:
-                        found[info] = found_info_in_line = True
-                        if dtype in ["integer", "int"]:
-                            infos[info] = int(lines[i + 1].strip())
-                        elif dtype in ["real", "float", "double"]:
-                            infos[info] = float(lines[i + 1].strip())
-                        elif dtype in ["varchar", "character", "text"]:
-                            infos[info] = lines[i + 1].strip()
-                        else:
-                            raise ValueError("Invalid dtype: %s." % dtype)
+                        found_info_in_line = True
+                        infos[info] = _as_dtype(lines[i + 1].strip(), dtype)
 
-                        i += 3
+                        i += 2
                         break
 
             if found_info_in_line:
                 break
 
         i += 1
-
-    # Check for special columns, that are generated from extracted information
-    for info in infos:
-        if not found[info]:
-            if info.lower() in ["inchikey1", "inchikey_1"]:
-                inchikey = infos[db_specs[info]["DATA_ORIGIN"]]
-                if not inchikey:
-                    raise ValueError("InChIKey1 requested, but no InChIKey column is added to the database.")
-                if not isinstance(inchikey, str):
-                    raise ValueError("InChIKey must be stored as text.")
-                found[info] = True
-                infos[info] = inchikey.split("-")[0]
 
     return infos
 
@@ -220,6 +217,8 @@ def insert_info_from_sdf_strings(db_connection, db_specs, iter_cid_sdf):
     """
     start = timer()
 
+    n_cols = len(db_specs["columns"])
+
     new_rows = []
 
     for cid, sdf in iter_cid_sdf:
@@ -230,10 +229,14 @@ def insert_info_from_sdf_strings(db_connection, db_specs, iter_cid_sdf):
             if v.get("NOT_NULL", False) and mol_sdf[k] is None:
                 continue
 
-        new_rows.append((v for v in mol_sdf.values()))
+        # db_connection.execute("INSERT INTO compounds (%s) VALUES (%s)"
+        #                       % (",".join(db_specs["columns"].keys()), ",".join(["?"] * n_cols)),
+        #                       tuple(v for v in mol_sdf.values()))
+
+        new_rows.append(tuple(v for v in mol_sdf.values()))
 
     n_cols = len(db_specs["columns"])
-    db_connection.executemany("INSERT INTO info (%s) VALUES(%s)"
+    db_connection.executemany("INSERT INTO compounds (%s) VALUES (%s)"
                               % (",".join(db_specs["columns"].keys()), ",".join(["?"] * n_cols)),
                               new_rows)
 
@@ -298,8 +301,7 @@ def initialize_db(db_connection, specs, reset=False):
     db_connection.execute("CREATE TABLE sdf_file("
                           "filename          VARCHAR PRIMARY KEY,"
                           "lowest_cid        INTEGER,"
-                          "highest_cid       INTEGER,"
-                          "last_modification REAL)")
+                          "highest_cid       INTEGER)")
 
     # Table containing the compounds
     db_connection.execute("DROP TABLE IF EXISTS compounds")
