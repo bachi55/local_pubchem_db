@@ -68,3 +68,22 @@ The json-file contains consists of nested dictionaries. The one containing the D
 | NOT_NULL | If true, the column cannot contain null entries. If a compound does not have the requested property and the corresponding column should not be null, *it will not be added* to tha DB. | 
 | PRIMARY_KEY | If true, the column is used as primary key for the *compounds* table. Currently, only one column can be specified as primary key. | 
 | WITH_INDEX | If true, an index is created for the column. This allows faster queries with constraints on this column. | 
+
+### (3) Build the Database
+
+The DB is build using: 
+```bash
+cd pubchem
+mkdir db
+# Create your db-layout
+touch db/db_layout.json
+# Edit it ... 
+# vim db/db_layout.jso
+python /path/to/local_pubchem_db/build_pubchem_db.py pubchem [--gzip](https://github.com/bachi55/local_pubchem_db/blob/1094c30897a90b611d226b64352c18a757c0548e/build_pubchem_db.py#L104) --db_layout_fn=db/db_layout.json
+```
+Please note: PubChem contains *many* compound and the resulting SQLite file can be very large. Especially when the indices are created sqlite might require twice the memory of the DB for some time. Ensure your drive has enough memory. If you face the problem, that your systems temp-directory runs out of memory, when creating the indices, have a look [here](https://sqlite.org/tempfiles.html#temporary_file_storage_locations). You can temporarily change sqlite's temp-directory by setting ```SQLITE_TMPDIR```:
+```bash
+SQLITE_TMPDIR=/my/large/disk/temp python /path/to/local_pubchem_db/build_pubchem_db.py pubchem --gzip --db_layout_fn=db/db_layout.json
+```
+
+
