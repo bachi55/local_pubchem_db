@@ -6,17 +6,8 @@ import gzip
 import traceback
 import argparse
 
-from datetime import datetime
-
-from misc import iter_sdf_file, initialize_db, load_db_specifications, insert_info_from_sdf_strings
-from misc import get_sdf_files_not_in_db
-
-"""
-This script can be used to parse a set of SDF files and add (some of) the
-content to a SQLite database.
-
-This code is based on Huibin's implementation.
-"""
+from pubchem2sqlite.utils import iter_sdf_file, initialize_db, load_db_specifications, insert_info_from_sdf_strings
+from pubchem2sqlite.utils import get_sdf_files_not_in_db
 
 
 def opensdf(fn, use_gzip):

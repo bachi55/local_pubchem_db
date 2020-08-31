@@ -2,7 +2,7 @@ import unittest
 import os
 import sqlite3
 
-from misc import get_column_stmt, iter_sdf_file, extract_info_from_sdf
+from pubchem2sqlite.utils import get_column_stmt, iter_sdf_file, extract_info_from_sdf
 from build_pubchem_db import build_db
 
 
