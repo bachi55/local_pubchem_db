@@ -6,16 +6,16 @@
             "NOT_NULL": true,
             "PRIMARY_KEY": true
         },
+        "InChI": {
+            "SD_TAG": ["PUBCHEM_IUPAC_INCHI"],
+            "DTYPE": "varchar",
+            "NOT_NULL": true
+        },
         "InChIKey": {
             "SD_TAG": ["PUBCHEM_IUPAC_INCHIKEY"],
             "DTYPE": "varchar",
             "NOT_NULL": true,
             "WITH_INDEX": true
-        },
-        "InChI": {
-            "SD_TAG": ["PUBCHEM_IUPAC_INCHI"],
-            "DTYPE": "varchar",
-            "NOT_NULL": true
         },
         "SMILES_CAN": {
             "SD_TAG": ["PUBCHEM_OPENEYE_CAN_SMILES"],
@@ -38,16 +38,16 @@
             "NOT_NULL": true,
             "WITH_INDEX": true
         },
-        "molecular_weight": {
-            "SD_TAG": ["PUBCHEM_MOLECULAR_WEIGHT"],
-            "DTYPE": "real",
-            "NOT_NULL": true
-        },
         "molecular_formula": {
             "SD_TAG": ["PUBCHEM_MOLECULAR_FORMULA"],
             "DTYPE": "varchar",
             "NOT_NULL": true,
             "WITH_INDEX": true
+        },
+        "molecular_weight": {
+            "SD_TAG": ["PUBCHEM_MOLECULAR_WEIGHT"],
+            "DTYPE": "real",
+            "NOT_NULL": true
         }
     }
 }

@@ -94,7 +94,7 @@ def main():
 
                     # add current sdf-file to the list of completed sdf-files
                     conn.execute("INSERT INTO sdf_file (filename, lowest_cid, highest_cid) "
-                                 "  VALUES(?,?,?,?)", (
+                                 "  VALUES(?,?,?)", (
                         os.path.basename(sdf_fn),
                         os.path.basename(sdf_fn).split(".")[0].split("_")[1],
                         os.path.basename(sdf_fn).split(".")[0].split("_")[2]))

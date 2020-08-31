@@ -36,6 +36,11 @@ def extract_info_from_sdf(sdf, db_specs):
     :return: OrderedDict, containing the extracted information.
     """
     infos = OrderedDict([(k, None) for k in db_specs["columns"]])
+    missing_infos = set(infos.keys())
+
+    # type of the information associated with the SD-tag
+    dtypes = {k: specs["DTYPE"].lower() for k, specs in db_specs["columns"].items()}
+    sdtags = {k: specs["SD_TAG"] for k, specs in db_specs["columns"].items()}
 
     lines = sdf.split("\n")
     n_line = len(lines)
@@ -49,22 +54,24 @@ def extract_info_from_sdf(sdf, db_specs):
 
         # Check whether the current line contains any required information
         found_info_in_line = False
-        for info in infos:
-            if infos[info] is None:
-                dtype = db_specs["columns"][info]["DTYPE"].lower()  # type of the information associated with the SD-tag
+        for info in missing_infos:
+            for sd_tag in sdtags[info]:
+                if sd_tag in lines[i]:
+                    infos[info] = _as_dtype(lines[i + 1], dtypes[info])
 
-                for sd_tag in db_specs["columns"][info]["SD_TAG"]:
-                    if lines[i].find(sd_tag) != -1:
-                        found_info_in_line = True
-                        infos[info] = _as_dtype(lines[i + 1].strip(), dtype)
+                    found_info_in_line = True
+                    missing_infos.remove(info)
 
-                        i += 2
-                        break
+                    i += 2
+                    break
 
             if found_info_in_line:
                 break
 
         i += 1
+
+    # if i == (n_line - 1):
+    #     print(infos)
 
     return infos
 
