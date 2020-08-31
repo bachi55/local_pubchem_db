@@ -10,9 +10,11 @@ def _as_dtype(val, dtype):
     """
     Convert a value represented using a string variable to the desired output data-type.
 
-    :param val:
-    :param dtype:
-    :return:
+    :param val: string, representation of the value to convert
+
+    :param dtype: string, desired output data-type
+
+    :return: input values converted to the output data-type
     """
     if dtype in ["integer", "int"]:
         oval = int(val)
