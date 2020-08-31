@@ -78,8 +78,8 @@ mkdir db
 # Create your db-layout
 touch db/db_layout.json
 # Edit it ... 
-# vim db/db_layout.jso
-python /path/to/local_pubchem_db/build_pubchem_db.py pubchem [--gzip](https://github.com/bachi55/local_pubchem_db/blob/1094c30897a90b611d226b64352c18a757c0548e/build_pubchem_db.py#L104) --db_layout_fn=db/db_layout.json
+# vim db/db_layout.json
+python /path/to/local_pubchem_db/build_pubchem_db.py pubchem --gzip --db_layout_fn=db/db_layout.json
 ```
 Please note: PubChem contains *many* compound and the resulting SQLite file can be very large. Especially when the indices are created sqlite might require twice the memory of the DB for some time. Ensure your drive has enough memory. If you face the problem, that your systems temp-directory runs out of memory, when creating the indices, have a look [here](https://sqlite.org/tempfiles.html#temporary_file_storage_locations). You can temporarily change sqlite's temp-directory by setting ```SQLITE_TMPDIR```:
 ```bash
