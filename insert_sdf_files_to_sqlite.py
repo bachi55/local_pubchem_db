@@ -82,10 +82,10 @@ def main():
 
                     # add current sdf-file to the list of completed sdf-files
                     conn.execute("INSERT INTO sdf_file (filename, lowest_cid, highest_cid) "
-                                 "  VALUES(?,?,?)", (
-                        os.path.basename(sdf_fn),
-                        os.path.basename(sdf_fn).split(".")[0].split("_")[1],
-                        os.path.basename(sdf_fn).split(".")[0].split("_")[2]))
+                                 "  VALUES(?,?,?)",
+                                 (os.path.basename(sdf_fn),
+                                  os.path.basename(sdf_fn).split(".")[0].split("_")[1],
+                                  os.path.basename(sdf_fn).split(".")[0].split("_")[2]))
 
         # Create indices after all sdf-files have been parsed and imported to the database.
         for colname, specs in db_specs["columns"].items():
