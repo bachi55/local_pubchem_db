@@ -1,5 +1,6 @@
 import re
 import json
+import os
 
 from collections import OrderedDict
 from timeit import default_timer as timer
@@ -46,7 +47,7 @@ def extract_info_from_sdf(sdf, db_specs):
     n_line = len(lines)
     i = 0
 
-    while any([v is None for v in infos.values()]) and i < (n_line - 1):
+    while missing_infos and i < (n_line - 1):
         # skip empty lines
         if not len(lines[i]):
             i += 1
@@ -70,145 +71,7 @@ def extract_info_from_sdf(sdf, db_specs):
 
         i += 1
 
-    # if i == (n_line - 1):
-    #     print(infos)
-
     return infos
-
-
-def extract_info_from_sdf_OLD(sdf):
-    """
-    Extract the information for a given molecules from its sdf-string.
-
-    :param sdf: string, containing the molecule's sdf
-
-    :return: dictionary, containing the extracted information.
-    """
-
-    info = {
-        "PUBCHEM_COMPOUND_CID": None,  # integer
-        "PUBCHEM_IUPAC_NAME": None,  # string
-        "PUBCHEM_IUPAC_INCHI": None,  # string
-        "PUBCHEM_IUPAC_INCHIKEY": None,  # string
-        "INCHIKEY1": None,  # string
-        "PUBCHEM_XLOGP3*": None,  # float
-        "PUBCHEM_MONOISOTOPIC_WEIGHT": None,  # float
-        "PUBCHEM_MOLECULAR_FORMULA": None,  # string
-        "PUBCHEM_OPENEYE_ISO_SMILES": None,  # string
-        "PUBCHEM_OPENEYE_CAN_SMILES": None,  # string
-        "PUBCHEM_ATOM_DEF_STEREO_COUNT": None,  # integer
-        "PUBCHEM_ATOM_UDEF_STEREO_COUNT": None,  # integer
-        "PUBCHEM_BOND_DEF_STEREO_COUNT": None,  # integer
-        "PUBCHEM_BOND_UDEF_STEREO_COUNT": None  # integer
-    }
-    found = {key: False for key in info.keys()}
-
-    lines = sdf.split("\n")
-    n_line = len(lines)
-    i = 0
-
-    while not all(found.values()) and i < (n_line - 1):
-        # skip empty lines
-        if not len(lines[i]):
-            i = i + 1
-            continue
-
-        if not found["PUBCHEM_COMPOUND_CID"] and lines[i].find("PUBCHEM_COMPOUND_CID") != -1:
-            found["PUBCHEM_COMPOUND_CID"] = True
-            info["PUBCHEM_COMPOUND_CID"] = int(lines[i + 1].strip())
-            i = i + 2
-            continue
-
-        if not found["PUBCHEM_IUPAC_NAME"] and lines[i].find("PUBCHEM_IUPAC_NAME") != -1:
-            found["PUBCHEM_IUPAC_NAME"] = True
-            info["PUBCHEM_IUPAC_NAME"] = lines[i + 1].strip()
-            i = i + 2
-            continue
-
-        if not found["PUBCHEM_IUPAC_INCHI"] and lines[i].find("PUBCHEM_IUPAC_INCHI") != -1:
-            found["PUBCHEM_IUPAC_INCHI"] = True
-            info["PUBCHEM_IUPAC_INCHI"] = lines[i + 1].strip()
-            i = i + 2
-            continue
-
-        if not found["PUBCHEM_IUPAC_INCHIKEY"] and lines[i].find("PUBCHEM_IUPAC_INCHIKEY") != -1:
-            found["PUBCHEM_IUPAC_INCHIKEY"] = True
-            found["INCHIKEY1"] = True
-            info["PUBCHEM_IUPAC_INCHIKEY"] = lines[i + 1].strip()
-            info["INCHIKEY1"] = info["PUBCHEM_IUPAC_INCHIKEY"].split("-")[0]
-            i = i + 2
-            continue
-
-        # PubChem uses XLOGP3 and XLOGP3_AA without any distinction [1]. Therefore, here we search for both information
-        # PUBCHEM_XLOGP3 and PUBCHEM_XLOGP3_AA. We take PUBCHEM_XLOGP3 if it was found earlier.
-        #
-        #  - XLOGP3: 'standard' model [2]
-        #  - XLOGP3_AA: predicted logp using pure atom-additive model [2]
-        #
-        # [1]: http://www.sioc-ccbg.ac.cn/skins/ccbgwebsite/software/xlogp3/manual/XLOGP3_Manual.pdf
-        # [2]: ftp://ftp.ncbi.nlm.nih.gov/pubchem/specifications/pubchem_sdtags.pdf (page 9)
-        if not found["PUBCHEM_XLOGP3*"] and lines[i].find("PUBCHEM_XLOGP3") != -1:
-            found["PUBCHEM_XLOGP3*"] = True
-            info["PUBCHEM_XLOGP3*"] = float(lines[i + 1].strip())
-            i = i + 2
-            continue
-        if not found["PUBCHEM_XLOGP3*"] and lines[i].find("PUBCHEM_XLOGP3_AA") != -1:
-            found["PUBCHEM_XLOGP3*"] = True
-            info["PUBCHEM_XLOGP3*"] = float(lines[i + 1].strip())
-            i = i + 2
-            continue
-
-        if not found["PUBCHEM_MONOISOTOPIC_WEIGHT"] and lines[i].find("PUBCHEM_MONOISOTOPIC_WEIGHT") != -1:
-            found["PUBCHEM_MONOISOTOPIC_WEIGHT"] = True
-            info["PUBCHEM_MONOISOTOPIC_WEIGHT"] = float(lines[i + 1].strip())
-            i = i + 2
-            continue
-
-        if not found["PUBCHEM_MOLECULAR_FORMULA"] and lines[i].find("PUBCHEM_MOLECULAR_FORMULA") != -1:
-            found["PUBCHEM_MOLECULAR_FORMULA"] = True
-            info["PUBCHEM_MOLECULAR_FORMULA"] = lines[i + 1].strip()
-            i = i + 2
-            continue
-
-        if not found["PUBCHEM_OPENEYE_ISO_SMILES"] and lines[i].find("PUBCHEM_OPENEYE_ISO_SMILES") != -1:
-            found["PUBCHEM_OPENEYE_ISO_SMILES"] = True
-            info["PUBCHEM_OPENEYE_ISO_SMILES"] = lines[i + 1].strip()
-            i = i + 2
-            continue
-
-        if not found["PUBCHEM_OPENEYE_CAN_SMILES"] and lines[i].find("PUBCHEM_OPENEYE_CAN_SMILES") != -1:
-            found["PUBCHEM_OPENEYE_CAN_SMILES"] = True
-            info["PUBCHEM_OPENEYE_CAN_SMILES"] = lines[i + 1].strip()
-            i = i + 2
-            continue
-
-        if not found["PUBCHEM_ATOM_DEF_STEREO_COUNT"] and lines[i].find("PUBCHEM_ATOM_DEF_STEREO_COUNT") != -1:
-            found["PUBCHEM_ATOM_DEF_STEREO_COUNT"] = True
-            info["PUBCHEM_ATOM_DEF_STEREO_COUNT"] = int(lines[i + 1].strip())
-            i = i + 2
-            continue
-
-        if not found["PUBCHEM_ATOM_UDEF_STEREO_COUNT"] and lines[i].find("PUBCHEM_ATOM_UDEF_STEREO_COUNT") != -1:
-            found["PUBCHEM_ATOM_UDEF_STEREO_COUNT"] = True
-            info["PUBCHEM_ATOM_UDEF_STEREO_COUNT"] = int(lines[i + 1].strip())
-            i = i + 2
-            continue
-
-        if not found["PUBCHEM_BOND_DEF_STEREO_COUNT"] and lines[i].find("PUBCHEM_BOND_DEF_STEREO_COUNT") != -1:
-            found["PUBCHEM_BOND_DEF_STEREO_COUNT"] = True
-            info["PUBCHEM_BOND_DEF_STEREO_COUNT"] = int(lines[i + 1].strip())
-            i = i + 2
-            continue
-
-        if not found["PUBCHEM_BOND_UDEF_STEREO_COUNT"] and lines[i].find("PUBCHEM_BOND_UDEF_STEREO_COUNT") != -1:
-            found["PUBCHEM_BOND_UDEF_STEREO_COUNT"] = True
-            info["PUBCHEM_BOND_UDEF_STEREO_COUNT"] = int(lines[i + 1].strip())
-            i = i + 2
-            continue
-
-        i = i + 1
-
-    return info
 
 
 def insert_info_from_sdf_strings(db_connection, db_specs, iter_cid_sdf):
@@ -224,28 +87,28 @@ def insert_info_from_sdf_strings(db_connection, db_specs, iter_cid_sdf):
     """
     start = timer()
 
-    n_cols = len(db_specs["columns"])
+    col_names = ",".join(db_specs["columns"].keys())
+    placeholders = ",".join(["?"] * len(db_specs["columns"]))
 
-    new_rows = []
+    # Get all columns that are requested to be NOT NULL
+    not_null_cols = set(col for col, specs in db_specs["columns"].items() if specs.get("NOT_NULL", False))
 
     for cid, sdf in iter_cid_sdf:
+        # Extract information
         mol_sdf = extract_info_from_sdf(sdf, db_specs)
 
-        # We skip PubChem entries that do not provide all information requested to be NOT NULL
-        for k, v in db_specs["columns"].items():
-            if v.get("NOT_NULL", False) and mol_sdf[k] is None:
-                continue
+        # Skip PubChem entries that do not provide all information requested to be NOT NULL
+        skip_sdf = False
+        for col in not_null_cols:
+            if mol_sdf[col] is None:
+                skip_sdf = True
+                break
+        if skip_sdf:
+            continue
 
-        # db_connection.execute("INSERT INTO compounds (%s) VALUES (%s)"
-        #                       % (",".join(db_specs["columns"].keys()), ",".join(["?"] * n_cols)),
-        #                       tuple(v for v in mol_sdf.values()))
-
-        new_rows.append(tuple(v for v in mol_sdf.values()))
-
-    n_cols = len(db_specs["columns"])
-    db_connection.executemany("INSERT INTO compounds (%s) VALUES (%s)"
-                              % (",".join(db_specs["columns"].keys()), ",".join(["?"] * n_cols)),
-                              new_rows)
+        # Insert extracted information to the database
+        db_connection.execute("INSERT INTO compounds (%s) VALUES (%s)" % (col_names, placeholders),
+                              tuple(v for v in mol_sdf.values()))
 
     end = timer()
     print("Extraction and insertion of the information took %.3fsec" % (end - start))
@@ -354,54 +217,14 @@ def iter_sdf_file(sdf_file_stream):
         yield cid, sdf_str
 
 
-def extract_single_info_from_sdf(sdf, field_identifier, dtype, return_cid=True):
+def get_sdf_files_not_in_db(db_connection, sdf_fn_in_folder):
     """
-    Extract the information for a given molecules from its sdf-string.
+    Returns the sdf_file names (full path) which are not already in the DB.
 
-    :param sdf: string, containing the molecule's sdf
-    :param field_identifier: string, which field of the sdf should be extracted
-    :param dtype: string, of which type is the desired information. Can be: "integer", "real" or "varchar"
-    :param return_cid: boolean, indicating whether the pubchem id should be returned as well, e.g. for consistency
-        checks.
-
-    return: dictionary, containing the extracted information: {field_identifier: value}
+    :param db_connection: sqlite3.Connection, database connection
+    :param sdf_fn_in_folder: list of string, filenames of the sdf-files.
     """
-    lines = sdf.split("\n")
-    n_line = len(lines)
-    i = 0
+    sdf_files_in_db = db_connection.execute("SELECT filename FROM sdf_file").fetchall()
+    sdf_files_in_db = [str(x[0]) for x in sdf_files_in_db]
 
-    info = {field_identifier: None}
-    if return_cid:
-        info["PUBCHEM_COMPOUND_CID"] = None
-
-    found = {key: False for key in info.keys()}
-
-    while not all(found.values()) and i < (n_line - 1):
-        # skip empty lines
-        if not len(lines[i]):
-            i += 1
-            continue
-
-        if return_cid and not found["PUBCHEM_COMPOUND_CID"] and lines[i].find("PUBCHEM_COMPOUND_CID") != -1:
-            found["PUBCHEM_COMPOUND_CID"] = True
-            info["PUBCHEM_COMPOUND_CID"] = int(lines[i + 1].strip())
-            i += 3
-            continue
-
-        if not found[field_identifier] and lines[i].find(field_identifier) != -1:
-            found[field_identifier] = True
-            if dtype == "integer":
-                info[field_identifier] = int(lines[i + 1].strip())
-            elif dtype == "real":
-                info[field_identifier] = float(lines[i + 1].strip())
-            elif dtype == "varchar":
-                info[field_identifier] = lines[i + 1].strip()
-            else:
-                raise ValueError("Invalid dtype: %s." % dtype)
-
-            i += 3
-            continue
-
-        i += 1
-
-    return info
+    return list(filter(lambda x: os.path.basename(x) not in sdf_files_in_db, sdf_fn_in_folder))

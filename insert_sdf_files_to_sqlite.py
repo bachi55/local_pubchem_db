@@ -9,6 +9,7 @@ import argparse
 from datetime import datetime
 
 from misc import iter_sdf_file, initialize_db, load_db_specifications, insert_info_from_sdf_strings
+from misc import get_sdf_files_not_in_db
 
 """
 This script can be used to parse a set of SDF files and add (some of) the
@@ -16,19 +17,6 @@ content to a SQLite database.
 
 This code is based on Huibin's implementation.
 """
-
-
-def get_sdf_files_not_in_db(db_connection, sdf_fn_in_folder):
-    """
-    Returns the sdf_file names (full path) which are not already in the DB.
-    
-    :param db_connection: sqlite3.Connection, database connection
-    :param sdf_fn_in_folder: list of string, filenames of the sdf-files.
-    """
-    sdf_files_in_db = db_connection.execute("SELECT filename FROM sdf_file").fetchall()
-    sdf_files_in_db = [str(x[0]) for x in sdf_files_in_db]
-                             
-    return list(filter(lambda x: os.path.basename(x) not in sdf_files_in_db, sdf_fn_in_folder))
 
 
 def main():
