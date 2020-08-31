@@ -144,7 +144,7 @@ def get_column_stmt(column_specs):
     for name, spec in column_specs.items():
         new_col = [name, spec["DTYPE"]]
 
-        if spec.get("NOT_NULL", True):
+        if spec.get("NOT_NULL", False) or spec.get("PRIMARY_KEY", False):
             new_col.append("not null")
 
         if spec.get("PRIMARY_KEY", False):
@@ -172,19 +172,20 @@ def initialize_db(db_connection, specs, reset=False):
 
     :param reset: boolean, If 'True' tables in the database are dropped and recreated.
     """
-    if not reset:
-        return
+    if reset:
+        db_connection.execute("DROP TABLE IF EXISTS sdf_file")
+        db_connection.execute("DROP TABLE IF EXISTS compounds")
 
     # Table to keep track about the sdf-chucks (files) included
-    db_connection.execute("DROP TABLE IF EXISTS sdf_file")
-    db_connection.execute("CREATE TABLE sdf_file("
-                          "filename          VARCHAR PRIMARY KEY,"
-                          "lowest_cid        INTEGER,"
-                          "highest_cid       INTEGER)")
+    db_connection.execute("CREATE TABLE IF NOT EXISTS sdf_file("
+                          "filename          VARCHAR NOT NULL PRIMARY KEY,"
+                          "lowest_cid        INTEGER NOT NULL,"
+                          "highest_cid       INTEGER NOT NULL,"
+                          "date_added        VARCHAR NOT NULL,"
+                          "n_compounds       INTEGER NOT NULL)")
 
     # Table containing the compounds
-    db_connection.execute("DROP TABLE IF EXISTS compounds")
-    db_connection.execute("CREATE TABLE compounds(%s)" % get_column_stmt(specs["columns"]))
+    db_connection.execute("CREATE TABLE IF NOT EXISTS compounds(%s)" % get_column_stmt(specs["columns"]))
 
 
 def split_sdf_file(sdf_file_stream):
@@ -236,4 +237,4 @@ def get_sdf_files_not_in_db(db_connection, sdf_fn_in_folder):
     sdf_files_in_db = db_connection.execute("SELECT filename FROM sdf_file").fetchall()
     sdf_files_in_db = [str(x[0]) for x in sdf_files_in_db]
 
-    return list(filter(lambda x: os.path.basename(x) not in sdf_files_in_db, sdf_fn_in_folder))
+    return sorted(list(filter(lambda x: os.path.basename(x) not in sdf_files_in_db, sdf_fn_in_folder)))
