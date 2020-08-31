@@ -85,5 +85,13 @@ Please note: PubChem contains *many* compound and the resulting SQLite file can 
 ```bash
 SQLITE_TMPDIR=/my/large/disk/temp python /path/to/local_pubchem_db/build_pubchem_db.py pubchem --gzip --db_layout_fn=db/db_layout.json
 ```
+## Version History
 
+#### 0.2:
+- Add flexibility for the DB-layout using a json-file
+- Add tests
+- Publish code as package
+- Change license to MIT
 
+#### 0.1:
+- Initial Version
