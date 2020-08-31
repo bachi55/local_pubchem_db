@@ -43,7 +43,7 @@ def extract_info_from_sdf(sdf, db_specs):
 
     # type of the information associated with the SD-tag
     dtypes = {k: specs["DTYPE"].lower() for k, specs in db_specs["columns"].items()}
-    sdtags = {k: specs["SD_TAG"] for k, specs in db_specs["columns"].items()}
+    sdtags = {k: ["> <%s>" % v for v in specs["SD_TAG"]] for k, specs in db_specs["columns"].items()}
 
     lines = sdf.split("\n")
     n_line = len(lines)
@@ -59,7 +59,7 @@ def extract_info_from_sdf(sdf, db_specs):
         found_info_in_line = False
         for info in missing_infos:
             for sd_tag in sdtags[info]:
-                if sd_tag in lines[i]:
+                if sd_tag == lines[i]:
                     infos[info] = _as_dtype(lines[i + 1], dtypes[info])
 
                     found_info_in_line = True
@@ -86,6 +86,8 @@ def insert_info_from_sdf_strings(db_connection, db_specs, iter_cid_sdf):
     :param db_specs: dictionary, containing the database specifications (see 'default_db_layout.json')
 
     :param iter_cid_sdf: list of (cid, sdf-string)-tuples
+
+    :return: scalar, number of inserted rows (compounds)
     """
     start = timer()
 
@@ -95,7 +97,9 @@ def insert_info_from_sdf_strings(db_connection, db_specs, iter_cid_sdf):
     # Get all columns that are requested to be NOT NULL
     not_null_cols = set(col for col, specs in db_specs["columns"].items() if specs.get("NOT_NULL", False))
 
-    for cid, sdf in iter_cid_sdf:
+    n_inserted = 0
+
+    for _, sdf in iter_cid_sdf:
         # Extract information
         mol_sdf = extract_info_from_sdf(sdf, db_specs)
 
@@ -111,9 +115,12 @@ def insert_info_from_sdf_strings(db_connection, db_specs, iter_cid_sdf):
         # Insert extracted information to the database
         db_connection.execute("INSERT INTO compounds (%s) VALUES (%s)" % (col_names, placeholders),
                               tuple(v for v in mol_sdf.values()))
+        n_inserted += 1
 
     end = timer()
     print("Extraction and insertion of the information took %.3fsec" % (end - start))
+
+    return n_inserted
 
 
 def load_db_specifications(fn):
