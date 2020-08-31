@@ -174,7 +174,7 @@ class TestSDFProcessing(unittest.TestCase):
 
 class TestDataImport(unittest.TestCase):
     def setUp(self):
-        self.base_dir = "./"
+        self.base_dir = "/"
         self.db_fn = os.path.join(self.base_dir, "db", "pubchem.sqlite")
 
     def tearDown(self):
