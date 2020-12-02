@@ -159,15 +159,8 @@ class TestSDFProcessing(unittest.TestCase):
 class TestDataImport(unittest.TestCase):
     def setUp(self):
         self.base_dir = os.path.dirname(__file__)
-        print(self.base_dir)
+        os.makedirs(os.path.join(self.base_dir, "db"), exist_ok=True)
         self.db_fn = os.path.join(self.base_dir, "db", "pubchem.sqlite")
-
-        os.makedirs(os.path.join(self.base_dir, "db"))
-
-        # with open(self.db_fn, "x") as file:
-        #     pass
-
-
 
     def tearDown(self):
         """
