@@ -162,7 +162,7 @@ class TestDataImport(unittest.TestCase):
         print(self.base_dir)
         self.db_fn = os.path.join(self.base_dir, "db", "pubchem.sqlite")
 
-        with open(self.db_fn, "w+") as file:
+        with open(self.db_fn, "x") as file:
             pass
 
     def tearDown(self):
