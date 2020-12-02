@@ -26,85 +26,43 @@ import os
 import sqlite3
 import unittest
 
+from collections import OrderedDict
+
 from pubchem2sqlite.utils import get_column_stmt, iter_sdf_file, extract_info_from_sdf, build_db
 
 
 class TestParsingJSONDBSpecs(unittest.TestCase):
     def test_get_column_stmt(self):
-        specs = {
-            "columns": {
-                "MASS": {
-                    "DTYPE": "float", "NOT_NULL": False
-                },
-                "INCHI": {
-                    "DTYPE": "string", "NOT_NULL": True
-                },
-                "CID": {
-                    "DTYPE": "integer", "PRIMARY_KEY": True
-                }
-            }
-        }
-
-        stmt = get_column_stmt(specs["columns"])
+        specs = OrderedDict([("MASS", {"DTYPE": "float", "NOT_NULL": False}),
+                             ("INCHI", {"DTYPE": "string", "NOT_NULL": True}),
+                             ("CID", {"DTYPE": "integer", "PRIMARY_KEY": True})])
+        stmt = get_column_stmt(specs)
         self.assertEqual("MASS float,INCHI string not null,CID integer not null primary key", stmt)
 
         ######################################
 
-        specs = {
-            "columns": {
-                "MASS": {
-                    "DTYPE": "float", "NOT_NULL": False
-                },
-                "INCHI": {
-                    "DTYPE": "string", "PRIMARY_KEY": True, "NOT_NULL": True
-                },
-                "CID": {
-                    "DTYPE": "integer"
-                }
-            }
-        }
-
-        stmt = get_column_stmt(specs["columns"])
+        specs = OrderedDict([("MASS", {"DTYPE": "float", "NOT_NULL": False}),
+                             ("INCHI", {"DTYPE": "string", "PRIMARY_KEY": True, "NOT_NULL": True}),
+                             ("CID", {"DTYPE": "integer"})])
+        stmt = get_column_stmt(specs)
         self.assertEqual("MASS float,INCHI string not null primary key,CID integer", stmt)
 
         ######################################
 
-        specs = {
-            "columns": {
-                "MASS": {
-                    "DTYPE": "float", "NOT_NULL": False
-                },
-                "INCHI": {
-                    "DTYPE": "string", "PRIMARY_KEY": True
-                },
-                "CID": {
-                    "DTYPE": "integer"
-                }
-            }
-        }
-
-        stmt = get_column_stmt(specs["columns"])
+        specs = OrderedDict([("MASS", {"DTYPE": "float", "NOT_NULL": False}),
+                             ("INCHI", {"DTYPE": "string", "PRIMARY_KEY": True}),
+                             ("CID", {"DTYPE": "integer"})])
+        stmt = get_column_stmt(specs)
         self.assertEqual("MASS float,INCHI string not null primary key,CID integer", stmt)
 
         ######################################
 
         # NOTE: The primary key label overwrites the not-null label. Primary keys are always not null.
 
-        specs = {
-            "columns": {
-                "MASS": {
-                    "DTYPE": "float", "NOT_NULL": False
-                },
-                "INCHI": {
-                    "DTYPE": "string", "PRIMARY_KEY": True, "NOT_NULL": False
-                },
-                "CID": {
-                    "DTYPE": "integer", "NOT_NULL": True
-                }
-            }
-        }
-
-        stmt = get_column_stmt(specs["columns"])
+        specs = OrderedDict([("MASS", {"DTYPE": "float", "NOT_NULL": False}),
+                             ("INCHI", { "DTYPE": "string", "PRIMARY_KEY": True, "NOT_NULL": False}),
+                             ("CID", {"DTYPE": "integer", "NOT_NULL": True})])
+        stmt = get_column_stmt(specs)
         self.assertEqual("MASS float,INCHI string not null primary key,CID integer not null", stmt)
 
 
