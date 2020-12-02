@@ -4,7 +4,7 @@ setup(
     name="pubchem2sqlite",
     version="0.2.0",
     license="MIT",
-    packages=find_packages(exclude=["tests", "build_pubchem_db.py"]),
+    packages=find_packages(exclude=["tests"]),
 
     # Minimum requirements the package was tested with
     install_requires=[

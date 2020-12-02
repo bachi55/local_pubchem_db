@@ -22,12 +22,11 @@
 # SOFTWARE.
 #####
 
-import unittest
 import os
 import sqlite3
+import unittest
 
-from pubchem2sqlite.utils import get_column_stmt, iter_sdf_file, extract_info_from_sdf
-from build_pubchem_db import build_db
+from pubchem2sqlite.utils import get_column_stmt, iter_sdf_file, extract_info_from_sdf, build_db
 
 
 class TestParsingJSONDBSpecs(unittest.TestCase):
@@ -110,19 +109,22 @@ class TestParsingJSONDBSpecs(unittest.TestCase):
 
 
 class TestSDFProcessing(unittest.TestCase):
+    def setUp(self):
+        self.base_dir = os.path.dirname(__file__)
+
     def test_sdf_molecule_iterator(self):
         cids = [31038, 31039, 31040]
-        with open("sdf/cmps_00_02.sdf", "r") as sdf_file:
+        with open(os.path.join(self.base_dir, "sdf", "cmps_00_02.sdf"), "r") as sdf_file:
             for idx, (cid, sdf) in enumerate(iter_sdf_file(sdf_file)):
                 self.assertEqual(cids[idx], cid)
 
         cids = [34516, 34517, 34518]
-        with open("sdf/cmps_03_05.sdf", "r") as sdf_file:
+        with open(os.path.join(self.base_dir, "sdf", "cmps_03_05.sdf"), "r") as sdf_file:
             for idx, (cid, sdf) in enumerate(iter_sdf_file(sdf_file)):
                 self.assertEqual(cids[idx], cid)
 
         cids = [46773, 46774]
-        with open("sdf/cmps_06_07.sdf", "r") as sdf_file:
+        with open(os.path.join(self.base_dir, "sdf", "cmps_06_07.sdf"), "r") as sdf_file:
             for idx, (cid, sdf) in enumerate(iter_sdf_file(sdf_file)):
                 self.assertEqual(cids[idx], cid)
 
@@ -153,7 +155,7 @@ class TestSDFProcessing(unittest.TestCase):
             "InChI=1S/C11H18O2/c1-2-3-4-5-6-7-8-9-10-11(12)13/h1H,3-10H2,(H,12,13)",
             "InChI=1S/C5H6O5.2Na/c6-3(5(9)10)1-2-4(7)8;;/h1-2H2,(H,7,8)(H,9,10);;/q;2*+1/p-2"]
         xlogp3s = [6.6, 3.3, None]
-        with open("sdf/cmps_00_02.sdf", "r") as sdf_file:
+        with open(os.path.join(self.base_dir, "sdf", "cmps_00_02.sdf"), "r") as sdf_file:
             for idx, (cid, sdf) in enumerate(iter_sdf_file(sdf_file)):
                 infos = extract_info_from_sdf(sdf, specs)
 
@@ -170,7 +172,7 @@ class TestSDFProcessing(unittest.TestCase):
             "InChI=1S/C11H18O2/c1-2-3-4-5-6-7-8-9-10-11(12)13/h1H,3-10H2,(H,12,13)",
             "InChI=1S/C5H6O5.2Na/c6-3(5(9)10)1-2-4(7)8;;/h1-2H2,(H,7,8)(H,9,10);;/q;2*+1/p-2"]
         xlogp3s = [None, 3.3, None]
-        with open("sdf/cmps_00_02.sdf", "r") as sdf_file:
+        with open(os.path.join(self.base_dir, "sdf", "cmps_00_02.sdf"), "r") as sdf_file:
             for idx, (cid, sdf) in enumerate(iter_sdf_file(sdf_file)):
                 infos = extract_info_from_sdf(sdf, specs_no_AA_xlogp3)
 
@@ -187,7 +189,7 @@ class TestSDFProcessing(unittest.TestCase):
             "InChI=1S/C11H18O2/c1-2-3-4-5-6-7-8-9-10-11(12)13/h1H,3-10H2,(H,12,13)",
             "InChI=1S/C5H6O5.2Na/c6-3(5(9)10)1-2-4(7)8;;/h1-2H2,(H,7,8)(H,9,10);;/q;2*+1/p-2"]
         xlogp3s = [6.6, None, None]
-        with open("sdf/cmps_00_02.sdf", "r") as sdf_file:
+        with open(os.path.join(self.base_dir, "sdf", "cmps_00_02.sdf"), "r") as sdf_file:
             for idx, (cid, sdf) in enumerate(iter_sdf_file(sdf_file)):
                 infos = extract_info_from_sdf(sdf, specs_only_AA_xlogp3)
 
@@ -198,7 +200,7 @@ class TestSDFProcessing(unittest.TestCase):
 
 class TestDataImport(unittest.TestCase):
     def setUp(self):
-        self.base_dir = "/"
+        self.base_dir = os.path.dirname(__file__)
         self.db_fn = os.path.join(self.base_dir, "db", "pubchem.sqlite")
 
     def tearDown(self):
