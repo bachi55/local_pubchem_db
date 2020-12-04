@@ -10,7 +10,7 @@ This library can be used to build an [SQLite](https://www.sqlite.org/index.html)
 
 ## Installation 
  
-The library libraries only requirement is Python (TODO: add version), no external libraries need to be installed. Simply run:
+The library libraries only requirement is Python (tested on 3.5 - 3.8), no external libraries need to be installed. Simply run:
 ```bash
 git clone https://github.com/bachi55/local_pubchem_db
 cd local_pubchem_db
