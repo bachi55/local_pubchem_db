@@ -1,0 +1,6 @@
+name: pubchem2sqlite
+channels:
+  - conda-forge
+dependencies:
+  - python
+  - pip
