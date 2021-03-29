@@ -60,7 +60,7 @@ class TestParsingJSONDBSpecs(unittest.TestCase):
         # NOTE: The primary key label overwrites the not-null label. Primary keys are always not null.
 
         specs = OrderedDict([("MASS", {"DTYPE": "float", "NOT_NULL": False}),
-                             ("INCHI", { "DTYPE": "string", "PRIMARY_KEY": True, "NOT_NULL": False}),
+                             ("INCHI", {"DTYPE": "string", "PRIMARY_KEY": True, "NOT_NULL": False}),
                              ("CID", {"DTYPE": "integer", "NOT_NULL": True})])
         stmt = get_column_stmt(specs)
         self.assertEqual("MASS float,INCHI string not null primary key,CID integer not null", stmt)
@@ -154,6 +154,54 @@ class TestSDFProcessing(unittest.TestCase):
                 self.assertEqual(cid, infos["cid"])
                 self.assertEqual(inchis[idx], infos["InChI"])
                 self.assertEqual(xlogp3s[idx], infos["xlogp3"])
+
+    def test_data_transformation(self):
+        specs = {
+            "columns": {
+                "cid": {
+                    "SD_TAG": ["PUBCHEM_COMPOUND_CID"],
+                    "DTYPE": "integer",
+                    "NOT_NULL": True,
+                    "PRIMARY_KEY": True,
+                    "CREATE_LIKE": "lambda __x: 2 * __x"
+                },
+                "InChIKey": {
+                    "SD_TAG": ["PUBCHEM_IUPAC_INCHIKEY"],
+                    "DTYPE": "varchar",
+                    "NOT_NULL": True
+                },
+                "InChIKey_1": {
+                    "SD_TAG": ["PUBCHEM_IUPAC_INCHIKEY"],
+                    "DTYPE": "varchar",
+                    "NOT_NULL": True,
+                    "CREATE_LIKE": "lambda __x: __x.split('-')[0]"
+                },
+                "xlogp3": {
+                    "SD_TAG": ["PUBCHEM_XLOGP3", "PUBCHEM_XLOGP3_AA"],
+                    "DTYPE": "real",
+                    "NOT_NULL": False,
+                    "CREATE_LIKE": "lambda __x: round(__x)"
+                }
+            }
+        }
+
+        inchikeys = [
+            "JGUZOCJCNMVJHU-UHFFFAOYSA-N",
+            "OAOUTNMJEFWJPO-UHFFFAOYSA-N",
+            "YBGBJYVHJTVUSL-UHFFFAOYSA-L"]
+        xlogp3s = [6.6, 3.3, None]
+        with open(os.path.join(self.base_dir, "sdf", "cmps_00_02.sdf"), "r") as sdf_file:
+            for idx, (cid, sdf) in enumerate(iter_sdf_file(sdf_file)):
+                infos = extract_info_from_sdf(sdf, specs)
+
+                self.assertEqual(2 * cid, infos["cid"])
+                self.assertEqual(inchikeys[idx], infos["InChIKey"])
+                self.assertEqual(inchikeys[idx].split("-")[0], infos["InChIKey_1"])
+
+                if xlogp3s[idx] is None:
+                    self.assertIsNone(infos["xlogp3"])
+                else:
+                    self.assertEqual(round(xlogp3s[idx]), infos["xlogp3"])
 
 
 class TestDataImport(unittest.TestCase):

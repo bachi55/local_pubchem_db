@@ -87,6 +87,9 @@ SQLITE_TMPDIR=/my/large/disk/temp python /path/to/local_pubchem_db/build_pubchem
 ```
 ## Version History
 
+#### 0.3:
+- Add support for data-transformations of SDFTags
+
 #### 0.2:
 - Add flexibility for the DB-layout using a json-file
 - Add tests
