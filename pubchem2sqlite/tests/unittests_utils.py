@@ -60,7 +60,7 @@ class TestParsingJSONDBSpecs(unittest.TestCase):
         # NOTE: The primary key label overwrites the not-null label. Primary keys are always not null.
 
         specs = OrderedDict([("MASS", {"DTYPE": "float", "NOT_NULL": False}),
-                             ("INCHI", { "DTYPE": "string", "PRIMARY_KEY": True, "NOT_NULL": False}),
+                             ("INCHI", {"DTYPE": "string", "PRIMARY_KEY": True, "NOT_NULL": False}),
                              ("CID", {"DTYPE": "integer", "NOT_NULL": True})])
         stmt = get_column_stmt(specs)
         self.assertEqual("MASS float,INCHI string not null primary key,CID integer not null", stmt)
@@ -155,6 +155,54 @@ class TestSDFProcessing(unittest.TestCase):
                 self.assertEqual(inchis[idx], infos["InChI"])
                 self.assertEqual(xlogp3s[idx], infos["xlogp3"])
 
+    def test_data_transformation(self):
+        specs = {
+            "columns": {
+                "cid": {
+                    "SD_TAG": ["PUBCHEM_COMPOUND_CID"],
+                    "DTYPE": "integer",
+                    "NOT_NULL": True,
+                    "PRIMARY_KEY": True,
+                    "CREATE_LIKE": "lambda __x: 2 * __x"
+                },
+                "InChIKey": {
+                    "SD_TAG": ["PUBCHEM_IUPAC_INCHIKEY"],
+                    "DTYPE": "varchar",
+                    "NOT_NULL": True
+                },
+                "InChIKey_1": {
+                    "SD_TAG": ["PUBCHEM_IUPAC_INCHIKEY"],
+                    "DTYPE": "varchar",
+                    "NOT_NULL": True,
+                    "CREATE_LIKE": "lambda __x: __x.split('-')[0]"
+                },
+                "xlogp3": {
+                    "SD_TAG": ["PUBCHEM_XLOGP3", "PUBCHEM_XLOGP3_AA"],
+                    "DTYPE": "real",
+                    "NOT_NULL": False,
+                    "CREATE_LIKE": "lambda __x: round(__x)"
+                }
+            }
+        }
+
+        inchikeys = [
+            "JGUZOCJCNMVJHU-UHFFFAOYSA-N",
+            "OAOUTNMJEFWJPO-UHFFFAOYSA-N",
+            "YBGBJYVHJTVUSL-UHFFFAOYSA-L"]
+        xlogp3s = [6.6, 3.3, None]
+        with open(os.path.join(self.base_dir, "sdf", "cmps_00_02.sdf"), "r") as sdf_file:
+            for idx, (cid, sdf) in enumerate(iter_sdf_file(sdf_file)):
+                infos = extract_info_from_sdf(sdf, specs)
+
+                self.assertEqual(2 * cid, infos["cid"])
+                self.assertEqual(inchikeys[idx], infos["InChIKey"])
+                self.assertEqual(inchikeys[idx].split("-")[0], infos["InChIKey_1"])
+
+                if xlogp3s[idx] is None:
+                    self.assertIsNone(infos["xlogp3"])
+                else:
+                    self.assertEqual(round(xlogp3s[idx]), infos["xlogp3"])
+
 
 class TestDataImport(unittest.TestCase):
     def setUp(self):
@@ -207,6 +255,63 @@ class TestDataImport(unittest.TestCase):
         self.assertEqual("SISXGVIKZQKGLA-UHFFFAOYSA-N",
                          self.conn.execute("SELECT inchikey FROM compounds WHERE cid == 34516").fetchall()[0][0])
         self.assertEqual(6.6,
+                         self.conn.execute("SELECT xlogp3 FROM compounds WHERE cid == 31038").fetchall()[0][0])
+        self.assertEqual("InChI=1S/C5H6O5.2Na/c6-3(5(9)10)1-2-4(7)8;;/h1-2H2,(H,7,8)(H,9,10);;/q;2*+1/p-2",
+                         self.conn.execute("SELECT InChI FROM compounds WHERE cid == 31040").fetchall()[0][0])
+
+        ################################################################
+
+        # NOTE: Each compound for which at least one "NOT_NULL" information is None (=NULL) will be not added to the DB.
+
+        specs_not_null_xlogp = specs
+        specs_not_null_xlogp["columns"]["xlogp3"]["NOT_NULL"] = True
+        # Check that return value does not indicate any error
+        self.assertEqual(0, build_db(self.base_dir, use_gzip=True, reset=True, db_specs=specs))
+
+        self.conn = sqlite3.connect(self.db_fn)
+        self.assertEqual(5,
+                         self.conn.execute("SELECT count(*) FROM compounds").fetchall()[0][0])
+        cids = [r[0] for r in self.conn.execute("SELECT cid FROM compounds")]
+        self.assertNotIn(34516, cids)
+        self.assertNotIn(31040, cids)
+        self.assertNotIn(46774, cids)
+
+    def test_db_import_with_data_transformation(self):
+        specs = {
+            "columns": {
+                "cid": {
+                    "SD_TAG": ["PUBCHEM_COMPOUND_CID"],
+                    "DTYPE": "integer",
+                    "NOT_NULL": True,
+                    "PRIMARY_KEY": True
+                },
+                "inchikey": {
+                    "SD_TAG": ["PUBCHEM_IUPAC_INCHIKEY"],
+                    "DTYPE": "varchar",
+                    "NOT_NULL": True
+                },
+                "InChI": {
+                    "SD_TAG": ["PUBCHEM_IUPAC_INCHI"],
+                    "DTYPE": "varchar",
+                    "NOT_NULL": True
+                },
+                "xlogp3": {
+                    "SD_TAG": ["PUBCHEM_XLOGP3", "PUBCHEM_XLOGP3_AA"],
+                    "DTYPE": "real",
+                    "NOT_NULL": False,
+                    "CREATE_LIKE": "lambda __x: __x ** 2"
+                }
+            }
+        }
+        # Check that return value does not indicate any error
+        self.assertEqual(0, build_db(self.base_dir, use_gzip=True, reset=True, db_specs=specs))
+
+        self.conn = sqlite3.connect(self.db_fn)
+        self.assertEqual(8,
+                         self.conn.execute("SELECT count(*) FROM compounds").fetchall()[0][0])
+        self.assertEqual("SISXGVIKZQKGLA-UHFFFAOYSA-N",
+                         self.conn.execute("SELECT inchikey FROM compounds WHERE cid == 34516").fetchall()[0][0])
+        self.assertEqual(6.6 ** 2,
                          self.conn.execute("SELECT xlogp3 FROM compounds WHERE cid == 31038").fetchall()[0][0])
         self.assertEqual("InChI=1S/C5H6O5.2Na/c6-3(5(9)10)1-2-4(7)8;;/h1-2H2,(H,7,8)(H,9,10);;/q;2*+1/p-2",
                          self.conn.execute("SELECT InChI FROM compounds WHERE cid == 31040").fetchall()[0][0])

@@ -35,17 +35,23 @@ You can specify the DB layout using a simple json-file (see also this [example](
 ```json
 {
     "columns": {
-        "InChIKey": {
-            "SD_TAG": ["PUBCHEM_IUPAC_INCHIKEY"],
+        "InChI": {
+            "SD_TAG": ["PUBCHEM_IUPAC_INCHI"],
             "DTYPE": "varchar",
             "NOT_NULL": true,
             "PRIMARY_KEY": true
         },
-        "InChI": {
-            "SD_TAG": ["PUBCHEM_IUPAC_INCHI"],
+        "InChIKey": {
+            "SD_TAG": ["PUBCHEM_IUPAC_INCHIKEY"],
             "DTYPE": "varchar",
             "NOT_NULL": true
         },
+        "InChIKey_1": {
+            "SD_TAG": ["PUBCHEM_IUPAC_INCHIKEY"],
+            "DTYPE": "varchar",
+            "NOT_NULL": true,
+            "CREATE_LIKE": "lambda __x: __x.split('-')[0]"
+        },     
         "xlogp3": {
             "SD_TAG": ["PUBCHEM_XLOGP3", "PUBCHEM_XLOGP3_AA"],
             "DTYPE": "real",
@@ -54,20 +60,21 @@ You can specify the DB layout using a simple json-file (see also this [example](
         "cid": {
             "SD_TAG": ["PUBCHEM_COMPOUND_CID"],
             "DTYPE": "integer",
-            "NOT_NULL": true,
+            "NOT_NULL": true
         }
     }
 }
 ```
 The json-file contains consists of nested dictionaries. The one containing the DB layout is accessed via ```columns```. This dictionary contains a key for each column name in the [*compounds* table](https://github.com/bachi55/local_pubchem_db/blob/bd339a19ffd8b442eda54f0b8684270eabf4c357/pubchem2sqlite/utils.py#L162) and its properites:
 
-| Key | Description |
-| --- | --- |
-| [SD_TAG](https://ftp.ncbi.nlm.nih.gov/pubchem/specifications/pubchem_sdtags.pdf) | List of SD-Tags correponding to the column. For example ```[PUBCHEM_IUPAC_INCHI]``` refering to the InChI of a compound, or, ```["PUBCHEM_XLOGP3", "PUBCHEM_XLOGP3_AA"]``` to its predicted XLogP3 value (here more than one tag can occure in the sdf-files). | 
-| [DTYPE](https://github.com/bachi55/local_pubchem_db/blob/bd339a19ffd8b442eda54f0b8684270eabf4c357/pubchem2sqlite/utils.py#L9) | Type of the information behind the sd-tag. Must be a valid SQLite type. |
-| NOT_NULL | If true, the column cannot contain null entries. If a compound does not have the requested property and the corresponding column should not be null, *it will not be added* to tha DB. | 
-| PRIMARY_KEY | If true, the column is used as primary key for the *compounds* table. Currently, only one column can be specified as primary key. | 
-| WITH_INDEX | If true, an index is created for the column. This allows faster queries with constraints on this column. | 
+| Key | Description | Optional |
+| --- | --- | --- | 
+| [SD_TAG](https://ftp.ncbi.nlm.nih.gov/pubchem/specifications/pubchem_sdtags.pdf) | List of SD-Tags correponding to the column. For example ```[PUBCHEM_IUPAC_INCHI]``` refering to the InChI of a compound, or, ```["PUBCHEM_XLOGP3", "PUBCHEM_XLOGP3_AA"]``` to its predicted XLogP3 value (here more than one tag can occure in the sdf-files). | No | 
+| [DTYPE](https://github.com/bachi55/local_pubchem_db/blob/bd339a19ffd8b442eda54f0b8684270eabf4c357/pubchem2sqlite/utils.py#L9) | Type of the information behind the sd-tag. Must be a valid SQLite type. | No |
+| NOT_NULL | If true, the column cannot contain null entries. If a compound does not have the requested property and the corresponding column should not be null, *it will not be added* to tha DB. | Yes |
+| PRIMARY_KEY | If true, the column is used as primary key for the *compounds* table. Currently, only one column can be specified as primary key. | Yes |
+| WITH_INDEX | If true, an index is created for the column. This allows faster queries with constraints on this column. | Yes |
+| CREATE_LIKE | Value of the SD_TAG can be transformed using a Python lambda function defined as string. For example ```"lambda __x: __x.split('-')[0]"``` applied to the InChIKey tag can be used to only return the first InChIKey part. The lambda function is applied after the value has been converted into the target DTYPE. | Yes |
 
 ### (3) Build the Database
 
@@ -86,6 +93,9 @@ Please note: PubChem contains *many* compound and the resulting SQLite file can 
 SQLITE_TMPDIR=/my/large/disk/temp python /path/to/local_pubchem_db/build_pubchem_db.py pubchem --gzip --db_layout_fn=db/db_layout.json
 ```
 ## Version History
+
+#### 0.3:
+- Add support for data-transformations of SD_TAG values using lambda functions
 
 #### 0.2:
 - Add flexibility for the DB-layout using a json-file

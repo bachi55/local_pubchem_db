@@ -17,6 +17,13 @@
             "NOT_NULL": true,
             "WITH_INDEX": true
         },
+        "InChIKey_1": {
+            "SD_TAG": ["PUBCHEM_IUPAC_INCHIKEY"],
+            "CREATE_LIKE": "lambda: __x: __x.split('-')[0]",
+            "DTYPE": "varchar",
+            "NOT_NULL": true,
+            "WITH_INDEX": true
+        },
         "SMILES_CAN": {
             "SD_TAG": ["PUBCHEM_OPENEYE_CAN_SMILES"],
             "DTYPE": "varchar",

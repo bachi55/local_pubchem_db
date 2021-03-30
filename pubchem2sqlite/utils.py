@@ -69,9 +69,25 @@ def extract_info_from_sdf(sdf, db_specs):
     infos = OrderedDict([(k, None) for k in db_specs["columns"]])
     missing_infos = set(infos.keys())
 
+    #####################################################
+    # TODO: This can be moves somewhere else. Its a global setup for all sdf-files.
     # type of the information associated with the SD-tag
-    dtypes = {k: specs["DTYPE"].lower() for k, specs in db_specs["columns"].items()}
-    sdtags = {k: ["> <%s>" % v for v in specs["SD_TAG"]] for k, specs in db_specs["columns"].items()}
+    dtypes = {}
+    create_likes = {}
+    sdtags2info = {}
+    for k, specs in db_specs["columns"].items():
+        dtypes[k] = specs["DTYPE"].lower()
+
+        # Check for value transformation function
+        if "CREATE_LIKE" in specs:
+            create_likes[k] = eval(specs["CREATE_LIKE"])
+
+        for sdtag in ["> <%s>" % v for v in specs["SD_TAG"]]:
+            try:
+                sdtags2info[sdtag].append(k)
+            except KeyError:
+                sdtags2info[sdtag] = [k]
+    #####################################################
 
     lines = sdf.split("\n")
     n_line = len(lines)
@@ -83,21 +99,19 @@ def extract_info_from_sdf(sdf, db_specs):
             i += 1
             continue
 
-        # Check whether the current line contains any required information
-        found_info_in_line = False
-        for info in missing_infos:
-            for sd_tag in sdtags[info]:
-                if sd_tag == lines[i]:
-                    infos[info] = _as_dtype(lines[i + 1], dtypes[info])
+        if lines[i].startswith("> ") and (lines[i] in sdtags2info):
+            for info in sdtags2info[lines[i]]:
+                val = _as_dtype(lines[i + 1], dtypes[info])
 
-                    found_info_in_line = True
-                    missing_infos.remove(info)
+                # Apply value transformation if provided
+                if info in create_likes:
+                    val = create_likes[info](val)
 
-                    i += 2
-                    break
+                infos[info] = val
 
-            if found_info_in_line:
-                break
+                missing_infos.remove(info)
+
+            i += 2
 
         i += 1
 
